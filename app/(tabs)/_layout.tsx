@@ -1,35 +1,116 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { Tabs } from "expo-router";
+import {
+    ChartArea,
+    House,
+    Package,
+    ShoppingBasket
+} from "lucide-react-native";
+import React from "react";
+import { Text, View } from "react-native";
 
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+type TabIconProps = {
+  title: string;
+  color: string;
+  icon: React.ReactNode;
+  focused: boolean;
+};
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+const TabIcon = ({ title, icon, focused }: TabIconProps) => {
+  if (focused) {
+    return (
+      <View className="bg-[#E2F4FF] min-w-[90px] min-h-14 rounded-lg flex-1 justify-center items-center">
+        {icon}
+        <Text className="text-sm font-medium text-secondary">{title}</Text>
+      </View>
+    );
+  }
+  return (
+    <View className="min-w-[90px] min-h-14 rounded-lg flex-1 justify-center items-center">
+      {icon}
+      <Text className="text-sm font-medium text-gray-500">{title}</Text>
+    </View>
+  );
+};
 
+const TabLayout = () => {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-      }}>
+        tabBarActiveTintColor: "#457B9D",
+        tabBarShowLabel: false,
+        tabBarStyle: {
+          paddingTop: 10,
+          paddingHorizontal: 5,
+        },
+      }}
+    >
+        
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: "Home",
+          headerShown: false,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon
+              focused={focused}
+              title="Home"
+              color={color}
+              icon={<House size={20} color={color} />}
+            />
+          ),
         }}
       />
+
       <Tabs.Screen
-        name="explore"
+        name="shop"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: "Shop",
+          headerShown: false,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon
+              focused={focused}
+              title="Shop"
+              color={color}
+              icon={<ShoppingBasket size={20} color={color} />}
+            />
+          ),
         }}
       />
+
+      <Tabs.Screen
+        name="restock"
+        options={{
+          title: "Restock",
+          headerShown: false,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon
+              focused={focused}
+              title="Restock"
+              color={color}
+              icon={<Package size={20} color={color} />}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="analytics"
+        options={{
+          title: "Analytics",
+          headerShown: false,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon
+              focused={focused}
+              title="Analytics"
+              color={color}
+              icon={<ChartArea size={20} color={color} />}
+            />
+          ),
+        }}
+      />
+
     </Tabs>
   );
-}
+};
+
+export default TabLayout;
