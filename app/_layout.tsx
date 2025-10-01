@@ -13,7 +13,13 @@ export default function RootLayout() {
               headerShown: false,
             }}
           />
-
+          <Stack.Screen
+            name="(shopconfig)"
+            options={{
+              headerShown: false,
+              presentation: 'modal' 
+            }}
+          />
         </Stack>
       </SafeAreaView>
     </SafeAreaProvider>

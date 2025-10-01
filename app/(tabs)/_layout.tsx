@@ -1,9 +1,9 @@
 import { Tabs } from "expo-router";
 import {
-    ChartArea,
-    House,
-    Package,
-    ShoppingBasket
+  ChartArea,
+  House,
+  Package,
+  ShoppingBasket
 } from "lucide-react-native";
 import React from "react";
 import { Text, View } from "react-native";
@@ -18,9 +18,9 @@ type TabIconProps = {
 const TabIcon = ({ title, icon, focused }: TabIconProps) => {
   if (focused) {
     return (
-      <View className="bg-[#E2F4FF] min-w-[90px] min-h-14 rounded-lg flex-1 justify-center items-center">
+      <View className="bg-[#235408] min-w-[90px] min-h-14 rounded-lg flex-1 justify-center items-center">
         {icon}
-        <Text className="text-sm font-medium text-secondary">{title}</Text>
+        <Text className="text-sm font-medium text-neutral-800">{title}</Text>
       </View>
     );
   }
@@ -36,7 +36,7 @@ const TabLayout = () => {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: "#457B9D",
+        tabBarActiveTintColor: "#831843",
         tabBarShowLabel: false,
         tabBarStyle: {
           paddingTop: 10,
