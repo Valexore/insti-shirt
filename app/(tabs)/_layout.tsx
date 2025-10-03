@@ -18,7 +18,7 @@ type TabIconProps = {
 const TabIcon = ({ title, icon, focused }: TabIconProps) => {
   if (focused) {
     return (
-      <View className="bg-[#235408] min-w-[90px] min-h-14 rounded-lg flex-1 justify-center items-center">
+      <View className="bg-[#ffe4e4] min-w-[90px] min-h-14 rounded-lg flex-1 justify-center items-center">
         {icon}
         <Text className="text-sm font-medium text-neutral-800">{title}</Text>
       </View>

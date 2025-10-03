@@ -42,6 +42,17 @@ const Shop = () => {
     xxxl: 0
   });
 
+  // Stock numbers for each size
+  const stockNumbers: Quantities = {
+    xs: 15,
+    small: 20,
+    medium: 25,
+    large: 18,
+    xl: 12,
+    xxl: 8,
+    xxxl: 5
+  };
+
   const sizes: SizeItem[] = [
     { key: 'xs', label: '{price}', image: extraSmallImg },
     { key: 'small', label: '{price}', image: smallImg },
@@ -55,7 +66,7 @@ const Shop = () => {
   const updateQuantity = (size: SizeKey, change: number) => {
     setQuantities(prev => ({
       ...prev,
-      [size]: Math.max(0, prev[size] + change)
+      [size]: Math.max(0, Math.min(prev[size] + change, stockNumbers[size]))
     }));
   };
 
@@ -109,6 +120,18 @@ const Shop = () => {
                 <Text className="text-neutral-500 text-sm">
                   Size: {size.key.toUpperCase()}
                 </Text>
+                {/* Stock Number Display */}
+                <Text className={`text-xs mt-1 ${
+                  stockNumbers[size.key] === 0 
+                    ? 'text-error' 
+                    : stockNumbers[size.key] < 5 
+                    ? 'text-warning' 
+                    : 'text-success'
+                }`}>
+                  {stockNumbers[size.key] === 0 
+                    ? 'Out of Stock' 
+                    : `stock: ${stockNumbers[size.key]} `}
+                </Text>
               </View>
               
               {/* Stepper Controls */}
@@ -131,7 +154,12 @@ const Shop = () => {
                 
                 <TouchableOpacity 
                   onPress={() => updateQuantity(size.key, 1)}
-                  className="w-8 h-8 bg-success rounded-full items-center justify-center"
+                  className={`w-8 h-8 rounded-full items-center justify-center ${
+                    quantities[size.key] < stockNumbers[size.key]
+                      ? 'bg-success'
+                      : 'bg-neutral-500'
+                  }`}
+                  disabled={quantities[size.key] >= stockNumbers[size.key]}
                 >
                   <Text className="text-white text-lg font-bold">+</Text>
                 </TouchableOpacity>

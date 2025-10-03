@@ -72,18 +72,25 @@ const Information = () => {
     setIsSubmitting(true);
     
     try {
-      // Handle form submission
-      console.log({
+      // Prepare the order data to pass to confirmation page
+      const orderData = {
         quantities,
         fullName,
         studentId,
         orNumber,
         college: selectedCollege
+      };
+      
+      console.log(orderData);
+      
+      // Navigate to confirmation page with the order data
+      router.push({
+        pathname: '/confirmation',
+        params: {
+          orderData: JSON.stringify(orderData)
+        }
       });
       
-      // Add your submission logic here
-      // After submission, you can go back to the shop
-      router.back();
     } catch (error) {
       console.error('Submission error:', error);
     } finally {
