@@ -1,0 +1,52 @@
+
+
+Release 0.0.0 -> 9/31/25
+
+------------------------------------------------
+ - Start Up
+ - Added tabs, routing, Assigns, Variables
+-------------------------------------------------
+
+
+
+Release 0.0.1 -> 10/1/25
+
+------------------------------------------------
+ - Minor Fixes to design such as Tabs, Router, Color Palletes and other layouts.
+ - Components
+-------------------------------------------------
+
+
+Release 0.0.2 -> 10/2/25
+
+    -Shop: Interface for freindly managing of orders
+    d -Contain al Size type of shirts
+    d -Added a Modal for Confimation fo the receivers information
+    d -Addded College Options for better user experience
+
+------------------------------------------------
+ - Changed primary color to a more vibrant shade for better visibility.
+ - Updated button styles to enhance user interaction feedback.
+ - Improved form validation logic to ensure all required fields are filled before submission.
+ - Added new components for better code organization and reusability.
+ - Fixed minor bugs in navigation and layout components.
+ - Enhanced responsiveness for various device sizes.
+ - Updated dependencies to the latest versions for improved performance and security.
+-------------------------------------------------
+
+Release 0.0.25 -> 10/3/25
+
+------------------------------------------------
+ -Shop:
+    -Added stock display on size selection
+    -Added summary screen before checkout
+    -Added Confirmation for the summary order
+ -Information:
+    -Added email input
+ -Confirmation:
+    -Added order summary
+    -General:
+        -Updated dependencies
+        -Migrated to EAS build system
+    -EAS Build under Configuration
+------------------------------------------------

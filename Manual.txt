@@ -16,5 +16,7 @@ eas build --platform android
 layout for receipt
 date-college-or.no-id
 
+input stepper -> min max input
+
 
 
