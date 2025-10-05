@@ -14,10 +14,16 @@ export default function RootLayout() {
             }}
           />
           <Stack.Screen
-            name="(shopconfig)"
+            name="(shop)"
             options={{
               headerShown: false,
-              presentation: 'modal' 
+              presentation: "modal",
+            }}
+          />
+          <Stack.Screen
+            name="(restock)"
+            options={{
+              headerShown: false,
             }}
           />
         </Stack>

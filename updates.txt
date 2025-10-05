@@ -50,3 +50,13 @@ Release 0.0.25 -> 10/3/25
         -Migrated to EAS build system
     -EAS Build under Configuration
 ------------------------------------------------
+
+Release 0.0.3 -> 10/4/25
+--------------------------------------------------------------
+- Added restock page
+- Added restock layout
+- Added manual.txt
+- Updated package-lock.json
+- Updated README.md
+- Updated app/(tabs)/restock.tsx
+--------------------------------------------------------------

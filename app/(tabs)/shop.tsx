@@ -1,6 +1,14 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Alert,
+  Image,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
 
 // These return numbers (image resource IDs), not strings
 const extraSmallImg = require('../../assets/images/size-shirt/extra-small.png');
@@ -42,6 +50,9 @@ const Shop = () => {
     xxxl: 0
   });
 
+  // Track which input is currently focused
+  const [focusedInput, setFocusedInput] = useState<SizeKey | null>(null);
+
   // Stock numbers for each size
   const stockNumbers: Quantities = {
     xs: 15,
@@ -70,11 +81,60 @@ const Shop = () => {
     }));
   };
 
+  const handleInputChange = (size: SizeKey, text: string) => {
+    // Allow empty string for better UX during typing
+    if (text === '') {
+      setQuantities(prev => ({ ...prev, [size]: 0 }));
+      return;
+    }
+
+    // Only allow numeric input
+    const numericValue = text.replace(/[^0-9]/g, '');
+    
+    if (numericValue === '') {
+      setQuantities(prev => ({ ...prev, [size]: 0 }));
+      return;
+    }
+
+    const newQuantity = parseInt(numericValue, 10);
+    
+    // Validate against stock limit
+    if (newQuantity > stockNumbers[size]) {
+      Alert.alert(
+        'Quantity Exceeds Stock',
+        `Maximum available for ${size.toUpperCase()} is ${stockNumbers[size]}`,
+        [{ text: 'OK' }]
+      );
+      setQuantities(prev => ({ 
+        ...prev, 
+        [size]: stockNumbers[size] 
+      }));
+    } else {
+      setQuantities(prev => ({ 
+        ...prev, 
+        [size]: newQuantity 
+      }));
+    }
+  };
+
+  const handleInputBlur = (size: SizeKey) => {
+    setFocusedInput(null);
+    
+    // Ensure quantity is at least 0 when input loses focus
+    if (quantities[size] < 0) {
+      setQuantities(prev => ({ ...prev, [size]: 0 }));
+    }
+  };
+
+  const handleInputFocus = (size: SizeKey) => {
+    setFocusedInput(size);
+  };
+
   const handleNext = () => {
     console.log('Selected quantities:', quantities);
     // Navigate to Information screen with quantities data
     router.push({
-      pathname: '/(shopconfig)/information',
+      pathname: '/(shop)/information',
       params: { quantities: JSON.stringify(quantities) }
     });
   };
@@ -134,7 +194,7 @@ const Shop = () => {
                 </Text>
               </View>
               
-              {/* Stepper Controls */}
+              {/* Stepper Controls with TextInput */}
               <View className="flex-row items-center space-x-3">
                 <TouchableOpacity 
                   onPress={() => updateQuantity(size.key, -1)}
@@ -148,9 +208,21 @@ const Shop = () => {
                   <Text className="text-white text-lg font-bold">-</Text>
                 </TouchableOpacity>
                 
-                <Text className="text-primary text-xl font-bold min-w-8 text-center">
-                  {quantities[size.key]}
-                </Text>
+                {/* TextInput for direct number entry */}
+                <TextInput
+                  className={`text-primary text-xl font-bold text-center border rounded-lg py-1 px-2 min-w-12 ${
+                    focusedInput === size.key 
+                      ? 'border-secondary bg-neutral-50' 
+                      : 'border-accent-100 bg-white'
+                  }`}
+                  value={quantities[size.key].toString()}
+                  onChangeText={(text) => handleInputChange(size.key, text)}
+                  onBlur={() => handleInputBlur(size.key)}
+                  onFocus={() => handleInputFocus(size.key)}
+                  keyboardType="numeric"
+                  maxLength={3} // Limit to 3 digits (reasonable for stock)
+                  selectTextOnFocus
+                />
                 
                 <TouchableOpacity 
                   onPress={() => updateQuantity(size.key, 1)}

@@ -6,20 +6,13 @@ const RestockLayout = () => {
     <Stack screenOptions={{ headerShown: false }}>
       
       <Stack.Screen
-        name="informationt"
+        name="restock_config"
         options={{
-          title: "Information",
+          title: "Restock Config",
           headerShown: false,
         }}
       />
       
-        <Stack.Screen
-        name="confirmation"
-        options={{
-          title: "Confirmation",
-          headerShown: false,
-        }}
-      />
 
 
     </Stack>
