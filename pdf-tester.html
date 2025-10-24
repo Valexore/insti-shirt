@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Layout Tester - Inventory Analytics</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: #2c5aa0;
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .controls {
+            background: #f8f9fa;
+            padding: 20px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .time-range-selector {
+            display: flex;
+            background: white;
+            border-radius: 8px;
+            padding: 4px;
+            border: 1px solid #ddd;
+        }
+
+        .time-range-selector button {
+            padding: 10px 20px;
+            border: none;
+            background: transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .time-range-selector button.active {
+            background: #2c5aa0;
+            color: white;
+        }
+
+        .preview-area {
+            padding: 40px;
+            background: white;
+        }
+
+        .pdf-preview {
+            border: 2px dashed #dee2e6;
+            border-radius: 10px;
+            padding: 40px;
+            background: white;
+            min-height: 800px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+
+        /* PDF Styles (Same as your React Native PDF) */
+        .pdf-body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            color: #333;
+            transform: scale(0.9);
+            transform-origin: top center;
+        }
+        .pdf-header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 20px;
+        }
+        .pdf-header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: #2c5aa0;
+        }
+        .pdf-header h2 {
+            margin: 5px 0;
+            font-size: 18px;
+            color: #666;
+        }
+        .pdf-info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+        .pdf-section {
+            margin-bottom: 25px;
+        }
+        .pdf-section-title {
+            background-color: #f0f0f0;
+            padding: 8px 12px;
+            font-weight: bold;
+            border-left: 4px solid #2c5aa0;
+            margin-bottom: 15px;
+        }
+        .pdf-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .pdf-stat-card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .pdf-stat-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c5aa0;
+        }
+        .pdf-stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .pdf-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 11px;
+        }
+        .pdf-table th {
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            font-weight: bold;
+        }
+        .pdf-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        .pdf-text-right {
+            text-align: right;
+        }
+        .pdf-text-center {
+            text-align: center;
+        }
+        .pdf-text-bold {
+            font-weight: bold;
+        }
+        .pdf-total-row {
+            background-color: #f0f0f0;
+            font-weight: bold;
+        }
+        .pdf-footer {
+            margin-top: 30px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+            font-size: 10px;
+            color: #666;
+        }
+        .pdf-performance-good { color: #28a745; }
+        .pdf-performance-warning { color: #ffc107; }
+        .pdf-performance-poor { color: #dc3545; }
+
+        .actions {
+            padding: 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            text-align: center;
+        }
+
+        .action-button {
+            padding: 12px 30px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s ease;
+        }
+
+        .action-button:hover {
+            background: #218838;
+        }
+
+        .data-controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .data-input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .data-input:focus {
+            outline: none;
+            border-color: #2c5aa0;
+        }
+
+        .refresh-btn {
+            padding: 8px 16px;
+            background: #17a2b8;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .refresh-btn:hover {
+            background: #138496;
+        }
+
+        .zoom-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .zoom-btn {
+            padding: 8px 12px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .zoom-btn:hover {
+            background: #5a6268;
+        }
+
+        .current-zoom {
+            font-weight: bold;
+            color: #495057;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 PDF Layout Tester</h1>
+            <p>Test your inventory analytics PDF layout in real-time</p>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <div class="time-range-selector">
+                    <button class="active" onclick="setTimeRange('week')">Week</button>
+                    <button onclick="setTimeRange('month')">Month</button>
+                    <button onclick="setTimeRange('quarter')">Quarter</button>
+                </div>
+
+                <div class="zoom-controls">
+                    <button class="zoom-btn" onclick="changeZoom(0.8)">Zoom Out</button>
+                    <span class="current-zoom" id="zoomLevel">90%</span>
+                    <button class="zoom-btn" onclick="changeZoom(1.1)">Zoom In</button>
+                </div>
+            </div>
+
+            <div class="data-controls">
+                <input type="number" id="totalRevenue" class="data-input" placeholder="Total Revenue" value="12540">
+                <input type="number" id="totalItems" class="data-input" placeholder="Total Items" value="342">
+                <input type="number" id="profit" class="data-input" placeholder="Profit" value="4090">
+                <input type="number" id="sellThroughRate" class="data-input" placeholder="Sell Through Rate" value="76.4" step="0.1">
+                <button class="refresh-btn" onclick="updatePreview()">🔄 Update Preview</button>
+            </div>
+        </div>
+
+        <div class="preview-area">
+            <div class="pdf-preview">
+                <div class="pdf-body" id="pdfPreview">
+                    <!-- PDF content will be generated here -->
+                </div>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button class="action-button" onclick="generateHTML()">📋 Copy HTML Code</button>
+            <button class="action-button" onclick="printPreview()">🖨️ Print Preview</button>
+        </div>
+    </div>
+
+    <script>
+        // Sample data structure (same as your React Native app)
+        const analyticsData = {
+            overview: {
+                totalRevenue: 12540,
+                totalItemsSold: 342,
+                averageSale: 36.67,
+                restockCost: 8450,
+                profit: 4090,
+                profitMargin: 32.6
+            },
+            
+            salesData: {
+                week: [1250, 1890, 1420, 2100, 1780, 1950, 2250],
+                month: [12540, 11870, 14200, 15680],
+                quarter: [45200, 48900, 51200, 52500]
+            },
+            
+            restockData: {
+                week: [45, 28, 35, 52, 40, 38, 45],
+                month: [200, 185, 220, 240],
+                quarter: [850, 920, 880, 950]
+            },
+            
+            topSellingSizes: [
+                { size: 'Medium', sold: 89, revenue: 3204, percentage: 26 },
+                { size: 'Large', sold: 76, revenue: 2736, percentage: 22 },
+                { size: 'Small', sold: 65, revenue: 2340, percentage: 19 },
+                { size: 'XL', sold: 52, revenue: 1872, percentage: 15 },
+                { size: 'XXL', sold: 35, revenue: 1260, percentage: 10 },
+                { size: 'XS', sold: 18, revenue: 648, percentage: 5 },
+                { size: 'XXXL', sold: 7, revenue: 252, percentage: 3 }
+            ],
+            
+            stockTurnover: [
+                { size: 'Medium', turnover: 3.2, days: 9.4 },
+                { size: 'Large', turnover: 2.8, days: 10.7 },
+                { size: 'Small', turnover: 2.5, days: 12.0 },
+                { size: 'XL', turnover: 2.1, days: 14.3 },
+                { size: 'XXL', turnover: 1.8, days: 16.7 },
+                { size: 'XS', turnover: 1.2, days: 25.0 },
+                { size: 'XXXL', turnover: 0.8, days: 37.5 }
+            ],
+            
+            performanceMetrics: {
+                sellThroughRate: 76.4,
+                stockoutFrequency: 12.3,
+                grossMarginReturn: 4.2,
+                inventoryAccuracy: 94.7
+            }
+        };
+
+        let currentTimeRange = 'week';
+        let currentZoom = 0.9;
+
+        function formatCurrency(amount) {
+            return `₱${amount.toLocaleString()}`;
+        }
+
+        function formatNumber(number) {
+            return number.toLocaleString();
+        }
+
+        function getTimeLabels(range) {
+            switch (range) {
+                case 'week':
+                    return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                case 'month':
+                    return ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+                case 'quarter':
+                    return ['Q1', 'Q2', 'Q3', 'Q4'];
+                default:
+                    return [];
+            }
+        }
+
+        function setTimeRange(range) {
+            currentTimeRange = range;
+            document.querySelectorAll('.time-range-selector button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            updatePreview();
+        }
+
+        function changeZoom(factor) {
+            currentZoom *= factor;
+            currentZoom = Math.max(0.5, Math.min(1.2, currentZoom));
+            document.getElementById('pdfPreview').style.transform = `scale(${currentZoom})`;
+            document.getElementById('zoomLevel').textContent = `${Math.round(currentZoom * 100)}%`;
+        }
+
+        function updatePreview() {
+            // Update data from inputs
+            analyticsData.overview.totalRevenue = parseInt(document.getElementById('totalRevenue').value) || 12540;
+            analyticsData.overview.totalItemsSold = parseInt(document.getElementById('totalItems').value) || 342;
+            analyticsData.overview.profit = parseInt(document.getElementById('profit').value) || 4090;
+            analyticsData.performanceMetrics.sellThroughRate = parseFloat(document.getElementById('sellThroughRate').value) || 76.4;
+
+            const timestamp = new Date().toLocaleString();
+            const timeRangeLabel = currentTimeRange.charAt(0).toUpperCase() + currentTimeRange.slice(1);
+            
+            const htmlContent = `
+                <div class="pdf-header">
+                    <h1>INVENTORY ANALYTICS REPORT</h1>
+                    <h2>Performance Insights and Inventory Metrics</h2>
+                    <div class="pdf-info-row">
+                        <div>Generated on: ${timestamp}</div>
+                        <div>Time Range: ${timeRangeLabel}</div>
+                    </div>
+                </div>
+
+                <!-- Financial Overview -->
+                <div class="pdf-section">
+                    <div class="pdf-section-title">FINANCIAL OVERVIEW</div>
+                    <div class="pdf-stats-grid">
+                        <div class="pdf-stat-card">
+                            <div class="pdf-stat-label">Total Revenue</div>
+                            <div class="pdf-stat-value">${formatCurrency(analyticsData.overview.totalRevenue)}</div>
+                            <div style="color: #28a745; font-size: 10px;">↑ 12.4% from last ${currentTimeRange}</div>
+                        </div>
+                        <div class="pdf-stat-card">
+                            <div class="pdf-stat-label">Items Sold</div>
+                            <div class="pdf-stat-value">${formatNumber(analyticsData.overview.totalItemsSold)}</div>
+                            <div style="color: #28a745; font-size: 10px;">↑ 8.2% from last ${currentTimeRange}</div>
+                        </div>
+                        <div class="pdf-stat-card">
+                            <div class="pdf-stat-label">Profit</div>
+                            <div class="pdf-stat-value">${formatCurrency(analyticsData.overview.profit)}</div>
+                            <div style="color: #28a745; font-size: 10px;">${analyticsData.overview.profitMargin}% margin</div>
+                        </div>
+                        <div class="pdf-stat-card">
+                            <div class="pdf-stat-label">Average Sale</div>
+                            <div class="pdf-stat-value">₱${analyticsData.overview.averageSale.toFixed(2)}</div>
+                            <div style="color: #ffc107; font-size: 10px;">↓ 2.1% from last ${currentTimeRange}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Performance Metrics -->
+                <div class="pdf-section">
+                    <div class="pdf-section-title">PERFORMANCE METRICS</div>
+                    <table class="pdf-table">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <th>Value</th>
+                                <th>Target</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Sell-Through Rate</td>
+                                <td>${analyticsData.performanceMetrics.sellThroughRate}%</td>
+                                <td>>70%</td>
+                                <td class="pdf-performance-good">Excellent</td>
+                            </tr>
+                            <tr>
+                                <td>Stockout Frequency</td>
+                                <td>${analyticsData.performanceMetrics.stockoutFrequency}%</td>
+                                <td><10%</td>
+                                <td class="pdf-performance-warning">Needs Improvement</td>
+                            </tr>
+                            <tr>
+                                <td>GMROI</td>
+                                <td>${analyticsData.performanceMetrics.grossMarginReturn}x</td>
+                                <td>>3x</td>
+                                <td class="pdf-performance-good">Good</td>
+                            </tr>
+                            <tr>
+                                <td>Inventory Accuracy</td>
+                                <td>${analyticsData.performanceMetrics.inventoryAccuracy}%</td>
+                                <td>>95%</td>
+                                <td class="pdf-performance-good">High</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Top Selling Sizes -->
+                <div class="pdf-section">
+                    <div class="pdf-section-title">TOP SELLING SIZES</div>
+                    <table class="pdf-table">
+                        <thead>
+                            <tr>
+                                <th>Size</th>
+                                <th>Units Sold</th>
+                                <th>Revenue</th>
+                                <th>Market Share</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${analyticsData.topSellingSizes.map(item => `
+                                <tr>
+                                    <td>${item.size}</td>
+                                    <td class="pdf-text-right">${formatNumber(item.sold)}</td>
+                                    <td class="pdf-text-right">${formatCurrency(item.revenue)}</td>
+                                    <td class="pdf-text-right">${item.percentage}%</td>
+                                </tr>
+                            `).join('')}
+                            <tr class="pdf-total-row">
+                                <td>TOTAL</td>
+                                <td class="pdf-text-right">${formatNumber(analyticsData.topSellingSizes.reduce((sum, item) => sum + item.sold, 0))}</td>
+                                <td class="pdf-text-right">${formatCurrency(analyticsData.topSellingSizes.reduce((sum, item) => sum + item.revenue, 0))}</td>
+                                <td class="pdf-text-right">100%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Stock Turnover -->
+                <div class="pdf-section">
+                    <div class="pdf-section-title">STOCK TURNOVER RATES</div>
+                    <table class="pdf-table">
+                        <thead>
+                            <tr>
+                                <th>Size</th>
+                                <th>Turnover Rate</th>
+                                <th>Days Inventory</th>
+                                <th>Performance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${analyticsData.stockTurnover.map(item => {
+                                const performance = item.turnover >= 2.5 ? 'pdf-performance-good' : 
+                                                  item.turnover >= 1.5 ? 'pdf-performance-warning' : 'pdf-performance-poor';
+                                const performanceText = item.turnover >= 2.5 ? 'Excellent' : 
+                                                      item.turnover >= 1.5 ? 'Good' : 'Needs Attention';
+                                return `
+                                    <tr>
+                                        <td>${item.size}</td>
+                                        <td class="pdf-text-right">${item.turnover}x</td>
+                                        <td class="pdf-text-right">${item.days}</td>
+                                        <td class="${performance}">${performanceText}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Sales Data -->
+                <div class="pdf-section">
+                    <div class="pdf-section-title">SALES DATA - ${timeRangeLabel.toUpperCase()}</div>
+                    <table class="pdf-table">
+                        <thead>
+                            <tr>
+                                <th>Period</th>
+                                <th>Sales</th>
+                                <th>Restock Units</th>
+                                <th>Net Change</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${getTimeLabels(currentTimeRange).map((label, index) => {
+                                const sales = analyticsData.salesData[currentTimeRange][index];
+                                const restock = analyticsData.restockData[currentTimeRange][index];
+                                const netChange = sales - (restock * 25);
+                                return `
+                                    <tr>
+                                        <td>${label}</td>
+                                        <td class="pdf-text-right">${formatCurrency(sales)}</td>
+                                        <td class="pdf-text-right">${formatNumber(restock)}</td>
+                                        <td class="pdf-text-right">${formatCurrency(netChange)}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                            <tr class="pdf-total-row">
+                                <td>TOTAL</td>
+                                <td class="pdf-text-right">${formatCurrency(analyticsData.salesData[currentTimeRange].reduce((a, b) => a + b, 0))}</td>
+                                <td class="pdf-text-right">${formatNumber(analyticsData.restockData[currentTimeRange].reduce((a, b) => a + b, 0))}</td>
+                                <td class="pdf-text-right">${formatCurrency(
+                                    analyticsData.salesData[currentTimeRange].reduce((a, b) => a + b, 0) - 
+                                    (analyticsData.restockData[currentTimeRange].reduce((a, b) => a + b, 0) * 25)
+                                )}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="pdf-footer">
+                    <div>Report generated by Inventory Management System</div>
+                    <div>For internal use only</div>
+                </div>
+            `;
+
+            document.getElementById('pdfPreview').innerHTML = htmlContent;
+        }
+
+        function generateHTML() {
+            const htmlContent = document.getElementById('pdfPreview').innerHTML;
+            navigator.clipboard.writeText(htmlContent).then(() => {
+                alert('HTML code copied to clipboard! You can now paste it into your React Native app.');
+            });
+        }
+
+        function printPreview() {
+            window.print();
+        }
+
+        // Initialize the preview
+        updatePreview();
+    </script>
+</body>
+</html> 

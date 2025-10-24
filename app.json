@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "insti-shirt",
+    "name": "ssr",
     "slug": "insti-shirt",
-    "version": "1.0.0",
+    "version": "1.l0ve.her",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "instishirt",
@@ -12,6 +12,10 @@
       "supportsTablet": true
     },
     "android": {
+      "permissions": [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -28,6 +32,8 @@
     },
     "plugins": [
       "expo-router",
+      "expo-file-system",
+      "expo-document-picker",
       [
         "expo-splash-screen",
         {
@@ -39,7 +45,8 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,

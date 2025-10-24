@@ -1,7 +1,13 @@
 
 
 
+Start -
+npm i/ npm install
+npm update / npm update (lib to upd)
+npx expo install --check > check all lib if latest or not
+npm uninstall ....
 
+npx expo --version > check expo version
 
 Design Library- /
 npm install lucide-react-native => react native icons
@@ -10,13 +16,29 @@ Printing Configuration Library- > not yet implemented
 npm install react-native-share  => import Share from 'react-native-share';
 npm install react-native-blob-util => import RNFetchBlob from 'react-native-blob-util';
 
-npm install -g eas-cli
+npm install -g eas-cli > install eas
 eas build --platform android
 
 layout for receipt
 date-college-or.no-id
 
 input stepper -> min max input
+
+eas build --platform android --profile preview > build the apk
+
+npx expo install expo-sharing > for file transfer
+npm install --save-dev @types/date-fns > for file save 
+or >     npx expo install expo-file-system expo-sharing xlsx
+npx expo install expo-document-picker > documentpicker = check in expo docu how to use it.
+
+as excel/xslx is removed, changed to pdf
+
+npx expo install react-native-view-shot
+npx expo install react-native-html-to-pdf
+
+npm install react-native-html-to-pdf
+npx expo install expo-print expo-sharing
+
 
 
 

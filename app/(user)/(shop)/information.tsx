@@ -10,10 +10,10 @@ import {
 } from 'react-native';
 
 // Components
-import Button, { BackButton } from '../components/Button';
-import CollegeOption from '../components/CollegeOption';
-import InputField from '../components/InputField';
-import Modal from '../components/Modal';
+import Button, { BackButton } from '../../components/Button';
+import CollegeOption from '../../components/CollegeOption';
+import InputField from '../../components/InputField';
+import Modal from '../../components/Modal';
 
 // Types
 type Quantities = {
@@ -34,12 +34,11 @@ type CollegeOption = {
 
 // Sample college data - replace with your actual images
 const collegeOptions: CollegeOption[] = [
-  { id: 'cics', name: 'College of Information and Computing Sciences', image: require('../../assets/images/size-shirt/extra-extra-extra-large.png') },
-  { id: 'coe', name: 'College of Engineering', image: require('../../assets/images/size-shirt/extra-extra-extra-large.png') },
-  { id: 'cas', name: 'College of Arts and Sciences', image: require('../../assets/images/size-shirt/extra-extra-extra-large.png') },
-  { id: 'cob', name: 'College of Business', image: require('../../assets/images/size-shirt/extra-extra-extra-large.png') },
-  { id: 'ccje', name: 'College of Criminal Justice Education', image: require('../../assets/images/size-shirt/extra-extra-extra-large.png') },
-  { id: 'cte', name: 'College of Teacher Education', image: require('../../assets/images/size-shirt/extra-extra-extra-large.png') },
+  { id: 'coe', name: 'College of Engineering', image: require('../../../assets/images/size-shirt/extra-extra-extra-large.png') },
+  { id: 'cas', name: 'College of Arts and Sciences', image: require('../../../assets/images/size-shirt/extra-extra-extra-large.png') },
+  { id: 'cob', name: 'College of Business', image: require('../../../assets/images/size-shirt/extra-extra-extra-large.png') },
+  { id: 'ccje', name: 'College of Criminal Justice Education', image: require('../../../assets/images/size-shirt/extra-extra-extra-large.png') },
+  { id: 'cte', name: 'College of Teacher Education', image: require('../../../assets/images/size-shirt/extra-extra-extra-large.png') },
 ];
 
 const Information = () => {

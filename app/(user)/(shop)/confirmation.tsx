@@ -69,7 +69,7 @@ const Confirmation = () => {
     console.log('Order confirmed:', orderData);
     
     // Navigate to success screen or home
-    router.replace('/(tabs)');
+    router.replace('../(tabs)');
   };
 
   const handleEditOrder = () => {

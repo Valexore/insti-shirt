@@ -41,8 +41,6 @@ Release 0.0.25 -> 10/3/25
     -Added stock display on size selection
     -Added summary screen before checkout
     -Added Confirmation for the summary order
- -Information:
-    -Added email input
  -Confirmation:
     -Added order summary
     -General:
@@ -60,3 +58,15 @@ Release 0.0.3 -> 10/4/25
 - Updated README.md
 - Updated app/(tabs)/restock.tsx
 --------------------------------------------------------------
+
+Release 0.0.4 -> 10/5/25
+--------------------------------------------------------------
+- Added restock configuration screen accessible from restock tab
+    -Added Quick Actions section for automatic restock every size in one go.
+    -Added Image beside each item for better identification.
+- Added vector icons for better UI/UX
+- Fixed navigation paths for restock and shop tabs
+- Improved code organization by separating restock and shop functionalities into distinct layouts
+- Updated dependencies to latest versions
+- Minor UI enhancements and bug fixes
+----------------------------------------------------------------

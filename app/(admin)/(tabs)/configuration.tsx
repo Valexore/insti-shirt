@@ -1,0 +1,1418 @@
+// app/(admin)/(tabs)/configuration.tsx
+import { ChevronDown, Plus, RotateCcw, Save, Settings, Trash2 } from 'lucide-react-native';
+import React, { useState } from 'react';
+import {
+  Alert,
+  Image,
+  ScrollView,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import Modal from '../../components/Modal';
+import {
+  availableImages,
+  College,
+  defaultFeatures,
+  defaultMonitoringSettings,
+  defaultReservationSettings,
+  defaultReturnSettings,
+  FeatureSettings,
+  getStockStatusColor,
+  getStockStatusText,
+  Item,
+  MonitoringSettings,
+  ReservationSettings,
+  resetAllSettings,
+  ReturnSettings,
+  sampleColleges,
+  sampleItems,
+  validateConfiguration
+} from './setfeature_configuration';
+
+const Configuration = () => {
+  const [activeTab, setActiveTab] = useState<'settings' | 'items' | 'colleges' | 'reservation' | 'returns' | 'monitoring'>('settings');
+
+  // State management
+  const [features, setFeatures] = useState<FeatureSettings>(defaultFeatures);
+  const [reservationSettings, setReservationSettings] = useState<ReservationSettings>(defaultReservationSettings);
+  const [returnSettings, setReturnSettings] = useState<ReturnSettings>(defaultReturnSettings);
+  const [monitoringSettings, setMonitoringSettings] = useState<MonitoringSettings>(defaultMonitoringSettings);
+  const [items, setItems] = useState<Item[]>(sampleItems);
+  const [colleges, setColleges] = useState<College[]>(sampleColleges);
+
+  // Modal states
+  const [sessionTimeout, setSessionTimeout] = useState('30');
+  const [loginAttempts, setLoginAttempts] = useState('5');
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [showAddCollegeModal, setShowAddCollegeModal] = useState(false);
+  const [showImageDropdown, setShowImageDropdown] = useState(false);
+  
+  const [newItem, setNewItem] = useState<Omit<Item, 'key'> & { key: string }>({
+    key: '',
+    label: '',
+    image: availableImages[0].image,
+    price: 299,
+    stock: 0,
+    rejected: 0,
+    lowStockThreshold: 5,
+    enabled: true
+  });
+  
+  const [newCollege, setNewCollege] = useState<Omit<College, 'id'> & { id: string }>({
+    id: '',
+    name: '',
+    enabled: true
+  });
+
+  // Handler functions
+  const toggleFeature = (feature: keyof FeatureSettings) => {
+    setFeatures(prev => ({
+      ...prev,
+      [feature]: !prev[feature]
+    }));
+  };
+
+  const toggleItemStatus = (itemKey: string) => {
+    setItems(prev => prev.map(item => 
+      item.key === itemKey ? { ...item, enabled: !item.enabled } : item
+    ));
+  };
+
+  const toggleCollegeStatus = (collegeId: string) => {
+    setColleges(prev => prev.map(college => 
+      college.id === collegeId ? { ...college, enabled: !college.enabled } : college
+    ));
+  };
+
+  const deleteItem = (itemKey: string) => {
+    Alert.alert(
+      'Delete Item',
+      'Are you sure you want to delete this item? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            setItems(prev => prev.filter(item => item.key !== itemKey));
+            Alert.alert('Success', 'Item deleted successfully');
+          }
+        }
+      ]
+    );
+  };
+
+  const deleteCollege = (collegeId: string) => {
+    Alert.alert(
+      'Delete College',
+      'Are you sure you want to delete this college? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            setColleges(prev => prev.filter(college => college.id !== collegeId));
+            Alert.alert('Success', 'College deleted successfully');
+          }
+        }
+      ]
+    );
+  };
+
+  const handleAddItem = () => {
+    if (!newItem.key || !newItem.label || !newItem.price) {
+      Alert.alert('Error', 'Please fill all required fields');
+      return;
+    }
+
+    if (items.find(item => item.key === newItem.key)) {
+      Alert.alert('Error', 'Item key already exists');
+      return;
+    }
+
+    setItems(prev => [...prev, newItem as Item]);
+    setShowAddItemModal(false);
+    setNewItem({
+      key: '',
+      label: '',
+      image: availableImages[0].image,
+      price: 299,
+      stock: 0,
+      rejected: 0,
+      lowStockThreshold: 5,
+      enabled: true
+    });
+    Alert.alert('Success', 'Item added successfully');
+  };
+
+  const handleAddCollege = () => {
+    if (!newCollege.id || !newCollege.name) {
+      Alert.alert('Error', 'Please fill all required fields');
+      return;
+    }
+
+    if (colleges.find(college => college.id === newCollege.id)) {
+      Alert.alert('Error', 'College ID already exists');
+      return;
+    }
+
+    setColleges(prev => [...prev, newCollege as College]);
+    setShowAddCollegeModal(false);
+    setNewCollege({
+      id: '',
+      name: '',
+      enabled: true
+    });
+    Alert.alert('Success', 'College added successfully');
+  };
+
+  const selectImage = (imageItem: typeof availableImages[0]) => {
+    setNewItem(prev => ({ ...prev, image: imageItem.image }));
+    setShowImageDropdown(false);
+  };
+
+  const saveConfiguration = () => {
+    if (!validateConfiguration(sessionTimeout, loginAttempts)) return;
+
+    setFeatures(prev => ({
+      ...prev,
+      sessionTimeout: parseInt(sessionTimeout),
+      loginAttemptLimit: parseInt(loginAttempts)
+    }));
+
+    Alert.alert('Success', 'Configuration saved successfully!');
+  };
+
+  const handleResetToDefaults = () => {
+    Alert.alert(
+      'Reset Configuration',
+      'Are you sure you want to reset all settings to default values?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => resetAllSettings(
+            setFeatures,
+            setReservationSettings,
+            setReturnSettings,
+            setMonitoringSettings,
+            setItems,
+            setColleges,
+            setSessionTimeout,
+            setLoginAttempts
+          )
+        }
+      ]
+    );
+  };
+
+  // Reusable Components
+  const FeatureToggle = ({ label, value, onToggle, description }: any) => (
+    <View className="flex-row items-center justify-between py-3 border-b border-accent-100">
+      <View className="flex-1">
+        <Text className="text-primary font-semibold text-base">{label}</Text>
+        <Text className="text-neutral-500 text-xs mt-1">{description}</Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onToggle}
+        trackColor={{ false: '#f0f0f0', true: '#3B82F6' }}
+        thumbColor={value ? '#ffffff' : '#f4f3f4'}
+      />
+    </View>
+  );
+
+  const NumberInput = ({ label, value, onChange, description, min, max, unit }: any) => (
+    <View className="flex-row items-center justify-between py-3 border-b border-accent-100">
+      <View className="flex-1">
+        <Text className="text-primary font-medium">{label}</Text>
+        <Text className="text-neutral-500 text-xs mt-1">{description}</Text>
+      </View>
+      <View className="flex-row items-center">
+        <TextInput
+          className="bg-neutral-50 border border-accent-100 rounded-lg px-3 py-2 text-primary w-20 text-right"
+          value={value.toString()}
+          onChangeText={onChange}
+          keyboardType="numeric"
+        />
+        {unit && <Text className="text-neutral-500 ml-2">{unit}</Text>}
+      </View>
+    </View>
+  );
+
+  // Tab Components (import these from separate files if they get too large)
+  const renderSettingsTab = () => (
+    <SettingsTab 
+      features={features}
+      toggleFeature={toggleFeature}
+      sessionTimeout={sessionTimeout}
+      setSessionTimeout={setSessionTimeout}
+      loginAttempts={loginAttempts}
+      setLoginAttempts={setLoginAttempts}
+      saveConfiguration={saveConfiguration}
+      handleResetToDefaults={handleResetToDefaults}
+      FeatureToggle={FeatureToggle}
+      NumberInput={NumberInput}
+    />
+  );
+
+  const renderItemsTab = () => (
+    <ItemsTab 
+      items={items}
+      showAddItemModal={showAddItemModal}
+      setShowAddItemModal={setShowAddItemModal}
+      toggleItemStatus={toggleItemStatus}
+      deleteItem={deleteItem}
+      getStockStatusColor={getStockStatusColor}
+      getStockStatusText={getStockStatusText}
+    />
+  );
+
+  const renderCollegesTab = () => (
+    <CollegesTab 
+      colleges={colleges}
+      showAddCollegeModal={showAddCollegeModal}
+      setShowAddCollegeModal={setShowAddCollegeModal}
+      toggleCollegeStatus={toggleCollegeStatus}
+      deleteCollege={deleteCollege}
+    />
+  );
+
+  const renderReservationTab = () => (
+    <ReservationTab 
+      reservationSettings={reservationSettings}
+      setReservationSettings={setReservationSettings}
+      FeatureToggle={FeatureToggle}
+      NumberInput={NumberInput}
+    />
+  );
+
+  const renderReturnsTab = () => (
+    <ReturnsTab 
+      returnSettings={returnSettings}
+      setReturnSettings={setReturnSettings}
+      FeatureToggle={FeatureToggle}
+      NumberInput={NumberInput}
+    />
+  );
+
+  const renderMonitoringTab = () => (
+    <MonitoringTab 
+      monitoringSettings={monitoringSettings}
+      setMonitoringSettings={setMonitoringSettings}
+      FeatureToggle={FeatureToggle}
+    />
+  );
+
+  return (
+    <View className="flex-1 bg-neutral-50">
+      {/* Header */}
+      <View className="bg-primary p-6 pt-12 pb-4">
+        <View className="flex-row items-center">
+          <Settings size={24} color="white" />
+          <Text className="text-white text-2xl font-bold ml-3">System Configuration</Text>
+        </View>
+        <Text className="text-accent-100 text-sm mt-1">
+          Configure user interface features and system settings
+        </Text>
+      </View>
+
+      {/* Tab Navigation - Scrollable */}
+      <View className="border-b border-accent-100 bg-white">
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          className="flex-row"
+          contentContainerStyle={{ flexGrow: 1 }}
+        >
+          <TouchableOpacity
+            className={`min-w-[100px] py-3 items-center ${
+              activeTab === 'settings' ? 'border-b-2 border-primary' : ''
+            }`}
+            onPress={() => setActiveTab('settings')}
+          >
+            <Text
+              className={`font-medium text-sm ${
+                activeTab === 'settings' ? 'text-primary' : 'text-neutral-500'
+              }`}
+            >
+              ⚙️ Settings
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            className={`min-w-[100px] py-3 items-center ${
+              activeTab === 'items' ? 'border-b-2 border-primary' : ''
+            }`}
+            onPress={() => setActiveTab('items')}
+          >
+            <Text
+              className={`font-medium text-sm ${
+                activeTab === 'items' ? 'text-primary' : 'text-neutral-500'
+              }`}
+            >
+              👕 Items
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            className={`min-w-[100px] py-3 items-center ${
+              activeTab === 'colleges' ? 'border-b-2 border-primary' : ''
+            }`}
+            onPress={() => setActiveTab('colleges')}
+          >
+            <Text
+              className={`font-medium text-sm ${
+                activeTab === 'colleges' ? 'text-primary' : 'text-neutral-500'
+              }`}
+            >
+              🏫 Colleges
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            className={`min-w-[100px] py-3 items-center ${
+              activeTab === 'reservation' ? 'border-b-2 border-primary' : ''
+            }`}
+            onPress={() => setActiveTab('reservation')}
+          >
+            <Text
+              className={`font-medium text-sm ${
+                activeTab === 'reservation' ? 'text-primary' : 'text-neutral-500'
+              }`}
+            >
+              📅 Reservation
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            className={`min-w-[100px] py-3 items-center ${
+              activeTab === 'returns' ? 'border-b-2 border-primary' : ''
+            }`}
+            onPress={() => setActiveTab('returns')}
+          >
+            <Text
+              className={`font-medium text-sm ${
+                activeTab === 'returns' ? 'text-primary' : 'text-neutral-500'
+              }`}
+            >
+              🔄 Returns
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            className={`min-w-[100px] py-3 items-center ${
+              activeTab === 'monitoring' ? 'border-b-2 border-primary' : ''
+            }`}
+            onPress={() => setActiveTab('monitoring')}
+          >
+            <Text
+              className={`font-medium text-sm ${
+                activeTab === 'monitoring' ? 'text-primary' : 'text-neutral-500'
+              }`}
+            >
+              📊 Monitoring
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+
+      {/* Tab Content */}
+      {activeTab === 'settings' && renderSettingsTab()}
+      {activeTab === 'items' && renderItemsTab()}
+      {activeTab === 'colleges' && renderCollegesTab()}
+      {activeTab === 'reservation' && renderReservationTab()}
+      {activeTab === 'returns' && renderReturnsTab()}
+      {activeTab === 'monitoring' && renderMonitoringTab()}
+
+      {/* Add Item Modal */}
+      <AddItemModal 
+        showAddItemModal={showAddItemModal}
+        setShowAddItemModal={setShowAddItemModal}
+        newItem={newItem}
+        setNewItem={setNewItem}
+        showImageDropdown={showImageDropdown}
+        setShowImageDropdown={setShowImageDropdown}
+        availableImages={availableImages}
+        selectImage={selectImage}
+        handleAddItem={handleAddItem}
+      />
+
+      {/* Add College Modal */}
+      <AddCollegeModal 
+        showAddCollegeModal={showAddCollegeModal}
+        setShowAddCollegeModal={setShowAddCollegeModal}
+        newCollege={newCollege}
+        setNewCollege={setNewCollege}
+        handleAddCollege={handleAddCollege}
+      />
+    </View>
+  );
+};
+
+// Tab Components (you can move these to separate files later)
+const SettingsTab = ({ features, toggleFeature, sessionTimeout, setSessionTimeout, loginAttempts, setLoginAttempts, saveConfiguration, handleResetToDefaults, FeatureToggle, NumberInput }: any) => (
+  <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+    {/* Action Buttons */}
+    <View className="mx-4 mt-4 flex-row justify-between">
+      <TouchableOpacity 
+        className="bg-white rounded-xl p-4 shadow-sm border border-accent-100 flex-1 mr-2 items-center flex-row justify-center"
+        onPress={saveConfiguration}
+      >
+        <Save size={16} color="#3B82F6" />
+        <Text className="text-primary font-semibold ml-2">Save Changes</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity 
+        className="bg-white rounded-xl p-4 shadow-sm border border-accent-100 flex-1 ml-2 items-center flex-row justify-center"
+        onPress={handleResetToDefaults}
+      >
+        <RotateCcw size={16} color="#EF4444" />
+        <Text className="text-error font-semibold ml-2">Reset Defaults</Text>
+      </TouchableOpacity>
+    </View>
+
+    {/* Shop Configuration */}
+    <View className="mx-4 mt-6 bg-white rounded-xl shadow-sm border border-accent-100">
+      <View className="p-4 border-b border-accent-100">
+        <Text className="text-primary text-lg font-bold">🛒 Shop Features</Text>
+        <Text className="text-neutral-500 text-sm mt-1">
+          Control shopping cart and POS functionality
+        </Text>
+      </View>
+      
+      <View className="p-4">
+        <FeatureToggle
+          label="Enable Shop Module"
+          value={features.shopEnabled}
+          onToggle={() => toggleFeature('shopEnabled')}
+          description="Allow users to process sales transactions"
+        />
+        
+        <FeatureToggle
+          label="Direct Quantity Input"
+          value={features.allowDirectQuantityInput}
+          onToggle={() => toggleFeature('allowDirectQuantityInput')}
+          description="Users can type quantities directly in shop"
+        />
+        
+        <FeatureToggle
+          label="Show Stock Levels"
+          value={features.showStockLevels}
+          onToggle={() => toggleFeature('showStockLevels')}
+          description="Display current stock numbers in shop"
+        />
+        
+        <FeatureToggle
+          label="Low Stock Warnings"
+          value={features.lowStockWarnings}
+          onToggle={() => toggleFeature('lowStockWarnings')}
+          description="Show warnings when stock is low"
+        />
+      </View>
+    </View>
+
+    {/* Restock Configuration */}
+    <View className="mx-4 mt-4 bg-white rounded-xl shadow-sm border border-accent-100">
+      <View className="p-4 border-b border-accent-100">
+        <Text className="text-primary text-lg font-bold">📦 Restock Features</Text>
+        <Text className="text-neutral-500 text-sm mt-1">
+          Manage inventory restocking functionality
+        </Text>
+      </View>
+      
+      <View className="p-4">
+        <FeatureToggle
+          label="Enable Restock Module"
+          value={features.restockEnabled}
+          onToggle={() => toggleFeature('restockEnabled')}
+          description="Allow users to add new inventory stock"
+        />
+        
+        <FeatureToggle
+          label="Quick Restock Buttons"
+          value={features.quickRestockButtons}
+          onToggle={() => toggleFeature('quickRestockButtons')}
+          description="Show +5, +10, +15 quick add buttons"
+        />
+        
+        <FeatureToggle
+          label="Bulk Restock Apply"
+          value={features.bulkRestockApply}
+          onToggle={() => toggleFeature('bulkRestockApply')}
+          description="Allow applying same quantity to all sizes"
+        />
+        
+        <FeatureToggle
+          label="Restock Confirmation"
+          value={features.restockConfirmation}
+          onToggle={() => toggleFeature('restockConfirmation')}
+          description="Show confirmation dialog before restocking"
+        />
+      </View>
+    </View>
+
+    {/* Analytics Configuration */}
+    <View className="mx-4 mt-4 bg-white rounded-xl shadow-sm border border-accent-100">
+      <View className="p-4 border-b border-accent-100">
+        <Text className="text-primary text-lg font-bold">📊 Analytics Features</Text>
+        <Text className="text-neutral-500 text-sm mt-1">
+          Control reporting and analytics visibility
+        </Text>
+      </View>
+      
+      <View className="p-4">
+        <FeatureToggle
+          label="Enable Analytics"
+          value={features.analyticsEnabled}
+          onToggle={() => toggleFeature('analyticsEnabled')}
+          description="Show analytics dashboard to users"
+        />
+        
+        <FeatureToggle
+          label="PDF Export"
+          value={features.pdfExport}
+          onToggle={() => toggleFeature('pdfExport')}
+          description="Allow users to export reports as PDF"
+        />
+        
+        <FeatureToggle
+          label="Performance Metrics"
+          value={features.performanceMetrics}
+          onToggle={() => toggleFeature('performanceMetrics')}
+          description="Show KPIs and performance indicators"
+        />
+        
+        <FeatureToggle
+          label="Sales Charts"
+          value={features.salesCharts}
+          onToggle={() => toggleFeature('salesCharts')}
+          description="Display sales and restock charts"
+        />
+      </View>
+    </View>
+
+    {/* New Features Configuration */}
+    <View className="mx-4 mt-4 bg-white rounded-xl shadow-sm border border-accent-100">
+      <View className="p-4 border-b border-accent-100">
+        <Text className="text-primary text-lg font-bold">🆕 Additional Features</Text>
+        <Text className="text-neutral-500 text-sm mt-1">
+          Enable or disable additional system modules
+        </Text>
+      </View>
+      
+      <View className="p-4">
+        <FeatureToggle
+          label="Reservation System"
+          value={features.reservationEnabled}
+          onToggle={() => toggleFeature('reservationEnabled')}
+          description="Allow customers to reserve items in advance"
+        />
+        
+        <FeatureToggle
+          label="Returns Management"
+          value={features.returnsEnabled}
+          onToggle={() => toggleFeature('returnsEnabled')}
+          description="Enable return and exchange functionality"
+        />
+        
+        <FeatureToggle
+          label="Monitoring & Reporting"
+          value={features.monitoringEnabled}
+          onToggle={() => toggleFeature('monitoringEnabled')}
+          description="Enable automated monitoring and PDF reports"
+        />
+      </View>
+    </View>
+
+    {/* Security Settings */}
+    <View className="mx-4 mt-4 mb-8 bg-white rounded-xl shadow-sm border border-accent-100">
+      <View className="p-4 border-b border-accent-100">
+        <Text className="text-primary text-lg font-bold">🔒 Security Settings</Text>
+        <Text className="text-neutral-500 text-sm mt-1">
+          Configure system security parameters
+        </Text>
+      </View>
+      
+      <View className="p-4">
+        <NumberInput
+          label="Session Timeout"
+          value={sessionTimeout}
+          onChange={setSessionTimeout}
+          description="Auto-logout after inactivity"
+          min="5"
+          max="120"
+          unit="minutes"
+        />
+        
+        <NumberInput
+          label="Login Attempt Limit"
+          value={loginAttempts}
+          onChange={setLoginAttempts}
+          description="Maximum failed login attempts"
+          min="3"
+          max="10"
+          unit="attempts"
+        />
+        
+        <FeatureToggle
+          label="Require Password Change"
+          value={features.requirePasswordChange}
+          onToggle={() => toggleFeature('requirePasswordChange')}
+          description="Force password change every 90 days"
+        />
+      </View>
+    </View>
+  </ScrollView>
+);
+
+// ... (Other tab components like ItemsTab, CollegesTab, ReservationTab, ReturnsTab, MonitoringTab would go here)
+// Due to length, I'll show the structure for one more:
+
+const ItemsTab = ({ items, showAddItemModal, setShowAddItemModal, toggleItemStatus, deleteItem, getStockStatusColor, getStockStatusText }: any) => (
+  <View className="flex-1">
+    {/* Add Item Button */}
+    <View className="mx-4 mt-4">
+      <TouchableOpacity 
+        className="bg-primary rounded-xl p-4 items-center flex-row justify-center"
+        onPress={() => setShowAddItemModal(true)}
+      >
+        <Plus size={20} color="white" />
+        <Text className="text-white font-semibold text-lg ml-2">Add New Item</Text>
+      </TouchableOpacity>
+    </View>
+
+    <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
+      <Text className="text-primary text-lg font-bold mb-3">
+        Current Items ({items.length})
+      </Text>
+
+      <View className="space-y-3">
+        {items.map((item: any) => (
+          <View
+            key={item.key}
+            className="bg-white rounded-xl p-4 shadow-sm border border-accent-100 mb-3"
+          >
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center flex-1">
+                <Image
+                  source={item.image}
+                  className="w-12 h-12 rounded-lg mr-3"
+                />
+                <View className="flex-1">
+                  <Text className="text-primary font-bold text-base">
+                    {item.label}
+                  </Text>
+                  <View className="mt-1">
+                    <View className="mb-1">
+                      <Text className="text-neutral-500 text-sm">
+                        Current Stock:{" "}
+                        <Text className="text-primary font-semibold">
+                          {item.stock}
+                        </Text>
+                      </Text>
+                    </View>
+                    <View>
+                      <Text className="text-neutral-500 text-sm">
+                        Price:{" "}
+                        <Text className="text-success font-semibold">
+                          ₱{item.price}
+                        </Text>
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              <View
+                className={`px-2 py-1 rounded-full ${getStockStatusColor(item.stock, item.lowStockThreshold)}`}
+              >
+                <Text className="text-white text-xs font-medium">
+                  {getStockStatusText(item.stock, item.lowStockThreshold)}
+                </Text>
+              </View>
+            </View>
+
+            {/* Low Stock Warning */}
+            {item.stock <= item.lowStockThreshold && (
+              <View className="mt-2 bg-warning/10 rounded-lg p-2">
+                <Text className="text-warning text-xs">
+                  {item.stock === 0
+                    ? "Out of stock - urgent restock needed"
+                    : `Low stock - only ${item.stock} items left`}
+                </Text>
+              </View>
+            )}
+
+            {/* Rejected Items Warning */}
+            {item.rejected > 0 && (
+              <View className="mt-2 bg-error/10 rounded-lg p-2">
+                <Text className="text-error text-xs">
+                  {item.rejected} rejected item(s) - needs inspection
+                </Text>
+              </View>
+            )}
+
+            {/* Item Actions */}
+            <View className="flex-row justify-between mt-3">
+              <View className="flex-row items-center">
+                <Text className="text-neutral-500 text-sm mr-2">Status:</Text>
+                <Switch
+                  value={item.enabled}
+                  onValueChange={() => toggleItemStatus(item.key)}
+                  trackColor={{ false: '#f0f0f0', true: '#3B82F6' }}
+                  thumbColor={item.enabled ? '#ffffff' : '#f4f3f4'}
+                />
+                <Text className="text-neutral-500 text-sm ml-2">
+                  {item.enabled ? 'Enabled' : 'Disabled'}
+                </Text>
+              </View>
+              
+              <TouchableOpacity 
+                className="bg-error/20 rounded-lg p-2"
+                onPress={() => deleteItem(item.key)}
+              >
+                <Trash2 size={16} color="#EF4444" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  </View>
+);
+
+// Colleges Tab Component
+const CollegesTab = ({ colleges, showAddCollegeModal, setShowAddCollegeModal, toggleCollegeStatus, deleteCollege }: any) => (
+  <View className="flex-1">
+    {/* Add College Button */}
+    <View className="mx-4 mt-4">
+      <TouchableOpacity 
+        className="bg-primary rounded-xl p-4 items-center flex-row justify-center"
+        onPress={() => setShowAddCollegeModal(true)}
+      >
+        <Plus size={20} color="white" />
+        <Text className="text-white font-semibold text-lg ml-2">Add New College</Text>
+      </TouchableOpacity>
+    </View>
+
+    <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
+      <Text className="text-primary text-lg font-bold mb-3">
+        Available Colleges ({colleges.length})
+      </Text>
+
+      <View className="space-y-3">
+        {colleges.map((college: any) => (
+          <View
+            key={college.id}
+            className="bg-white rounded-xl p-4 shadow-sm border border-accent-100 mb-3"
+          >
+            <View className="flex-row items-center justify-between">
+              <View className="flex-1">
+                <Text className="text-primary font-bold text-base">
+                  {college.name}
+                </Text>
+                <Text className="text-neutral-500 text-sm">
+                  ID: {college.id}
+                </Text>
+              </View>
+
+              <View className={`px-2 py-1 rounded-full ${college.enabled ? 'bg-success' : 'bg-neutral-300'}`}>
+                <Text className="text-white text-xs font-medium">
+                  {college.enabled ? 'Active' : 'Inactive'}
+                </Text>
+              </View>
+            </View>
+
+            {/* College Actions */}
+            <View className="flex-row justify-between mt-3">
+              <View className="flex-row items-center">
+                <Text className="text-neutral-500 text-sm mr-2">Status:</Text>
+                <Switch
+                  value={college.enabled}
+                  onValueChange={() => toggleCollegeStatus(college.id)}
+                  trackColor={{ false: '#f0f0f0', true: '#3B82F6' }}
+                  thumbColor={college.enabled ? '#ffffff' : '#f4f3f4'}
+                />
+                <Text className="text-neutral-500 text-sm ml-2">
+                  {college.enabled ? 'Enabled' : 'Disabled'}
+                </Text>
+              </View>
+              
+              <TouchableOpacity 
+                className="bg-error/20 rounded-lg p-2"
+                onPress={() => deleteCollege(college.id)}
+              >
+                <Trash2 size={16} color="#EF4444" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  </View>
+);
+
+// Reservation Tab Component
+const ReservationTab = ({ reservationSettings, setReservationSettings, FeatureToggle, NumberInput }: any) => (
+  <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
+    <Text className="text-primary text-lg font-bold mb-4">
+      Reservation System Configuration
+    </Text>
+
+    <View className="bg-white rounded-xl shadow-sm border border-accent-100 mb-4">
+      <View className="p-4 border-b border-accent-100">
+        <Text className="text-primary text-lg font-bold">⏰ Reservation Limits</Text>
+        <Text className="text-neutral-500 text-sm mt-1">
+          Configure reservation duration and limits
+        </Text>
+      </View>
+      
+      <View className="p-4">
+        <NumberInput
+          label="Maximum Reservation Days"
+          value={reservationSettings.maxReservationDays.toString()}
+          onChange={(text: string) => setReservationSettings((prev: any) => ({ 
+            ...prev, 
+            maxReservationDays: parseInt(text) || 7 
+          }))}
+          description="Maximum number of days a reservation can be held"
+          min="1"
+          max="30"
+          unit="days"
+        />
+        
+        <NumberInput
+          label="Auto-Cancel After"
+          value={reservationSettings.autoCancelHours.toString()}
+          onChange={(text: string) => setReservationSettings((prev: any) => ({ 
+            ...prev, 
+            autoCancelHours: parseInt(text) || 24 
+          }))}
+          description="Automatically cancel unpaid reservations after hours"
+          min="1"
+          max="168"
+          unit="hours"
+        />
+        
+        <NumberInput
+          label="Max Items Per Reservation"
+          value={reservationSettings.maxItemsPerReservation.toString()}
+          onChange={(text: string) => setReservationSettings((prev: any) => ({ 
+            ...prev, 
+            maxItemsPerReservation: parseInt(text) || 5 
+          }))}
+          description="Maximum number of items per reservation"
+          min="1"
+          max="20"
+          unit="items"
+        />
+      </View>
+    </View>
+
+    <View className="bg-white rounded-xl shadow-sm border border-accent-100 mb-4">
+      <View className="p-4 border-b border-accent-100">
+        <Text className="text-primary text-lg font-bold">💰 Deposit Settings</Text>
+        <Text className="text-neutral-500 text-sm mt-1">
+          Configure reservation deposit requirements
+        </Text>
+      </View>
+      
+      <View className="p-4">
+        <FeatureToggle
+          label="Require Deposit"
+          value={reservationSettings.requireDeposit}
+          onToggle={() => setReservationSettings((prev: any) => ({ 
+            ...prev, 
+            requireDeposit: !prev.requireDeposit 
+          }))}
+          description="Require deposit payment for reservations"
+        />
+        
+        {reservationSettings.requireDeposit && (
+          <NumberInput
+            label="Deposit Amount"
+            value={reservationSettings.depositAmount.toString()}
+            onChange={(text: string) => setReservationSettings((prev: any) => ({ 
+              ...prev, 
+              depositAmount: parseInt(text) || 50 
+            }))}
+            description="Amount required for reservation deposit"
+            min="0"
+            max="1000"
+            unit="₱"
+          />
+        )}
+      </View>
+    </View>
+
+    <View className="bg-white rounded-xl shadow-sm border border-accent-100">
+      <View className="p-4 border-b border-accent-100">
+        <Text className="text-primary text-lg font-bold">🔔 Notification Settings</Text>
+        <Text className="text-neutral-500 text-sm mt-1">
+          Configure reservation notifications and reminders
+        </Text>
+      </View>
+      
+      <View className="p-4">
+        <FeatureToggle
+          label="Allow Modification"
+          value={reservationSettings.allowModification}
+          onToggle={() => setReservationSettings((prev: any) => ({ 
+            ...prev, 
+            allowModification: !prev.allowModification 
+          }))}
+          description="Allow customers to modify their reservations"
+        />
+        
+        <FeatureToggle
+          label="Notification Reminders"
+          value={reservationSettings.notificationReminders}
+          onToggle={() => setReservationSettings((prev: any) => ({ 
+            ...prev, 
+            notificationReminders: !prev.notificationReminders 
+          }))}
+          description="Send reminder notifications before reservation expiry"
+        />
+      </View>
+    </View>
+  </ScrollView>
+);
+
+// Returns Tab Component
+const ReturnsTab = ({ returnSettings, setReturnSettings, FeatureToggle, NumberInput }: any) => (
+  <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
+    <Text className="text-primary text-lg font-bold mb-4">
+      Returns & Exchange Configuration
+    </Text>
+
+    <View className="bg-white rounded-xl shadow-sm border border-accent-100 mb-4">
+      <View className="p-4 border-b border-accent-100">
+        <Text className="text-primary text-lg font-bold">📅 Return Policy</Text>
+        <Text className="text-neutral-500 text-sm mt-1">
+          Configure return period and requirements
+        </Text>
+      </View>
+      
+      <View className="p-4">
+        <NumberInput
+          label="Return Period"
+          value={returnSettings.returnPeriodDays.toString()}
+          onChange={(text: string) => setReturnSettings((prev: any) => ({ 
+            ...prev, 
+            returnPeriodDays: parseInt(text) || 30 
+          }))}
+          description="Number of days allowed for returns after purchase"
+          min="1"
+          max="365"
+          unit="days"
+        />
+        
+        <NumberInput
+          label="Refund Processing Time"
+          value={returnSettings.refundProcessingDays.toString()}
+          onChange={(text: string) => setReturnSettings((prev: any) => ({ 
+            ...prev, 
+            refundProcessingDays: parseInt(text) || 7 
+          }))}
+          description="Days required to process refunds"
+          min="1"
+          max="30"
+          unit="days"
+        />
+        
+        <NumberInput
+          label="Damage Deduction Percentage"
+          value={returnSettings.damageDeductionPercent.toString()}
+          onChange={(text: string) => setReturnSettings((prev: any) => ({ 
+            ...prev, 
+            damageDeductionPercent: parseInt(text) || 20 
+          }))}
+          description="Percentage deducted for damaged items"
+          min="0"
+          max="100"
+          unit="%"
+        />
+      </View>
+    </View>
+
+    <View className="bg-white rounded-xl shadow-sm border border-accent-100 mb-4">
+      <View className="p-4 border-b border-accent-100">
+        <Text className="text-primary text-lg font-bold">⚙️ Return Process</Text>
+        <Text className="text-neutral-500 text-sm mt-1">
+          Configure return processing rules
+        </Text>
+      </View>
+      
+      <View className="p-4">
+        <FeatureToggle
+          label="Require Reason for Return"
+          value={returnSettings.requireReason}
+          onToggle={() => setReturnSettings((prev: any) => ({ 
+            ...prev, 
+            requireReason: !prev.requireReason 
+          }))}
+          description="Customers must provide reason for returns"
+        />
+        
+        <FeatureToggle
+          label="Allow Partial Returns"
+          value={returnSettings.allowPartialReturns}
+          onToggle={() => setReturnSettings((prev: any) => ({ 
+            ...prev, 
+            allowPartialReturns: !prev.allowPartialReturns 
+          }))}
+          description="Allow returning only some items from an order"
+        />
+        
+        <FeatureToggle
+          label="Auto-Restock Returns"
+          value={returnSettings.autoRestockReturns}
+          onToggle={() => setReturnSettings((prev: any) => ({ 
+            ...prev, 
+            autoRestockReturns: !prev.autoRestockReturns 
+          }))}
+          description="Automatically add returned items back to stock"
+        />
+        
+        <FeatureToggle
+          label="Quality Check Required"
+          value={returnSettings.qualityCheckRequired}
+          onToggle={() => setReturnSettings((prev: any) => ({ 
+            ...prev, 
+            qualityCheckRequired: !prev.qualityCheckRequired 
+          }))}
+          description="Require quality inspection before accepting returns"
+        />
+      </View>
+    </View>
+  </ScrollView>
+);
+
+// Monitoring Tab Component
+const MonitoringTab = ({ monitoringSettings, setMonitoringSettings, FeatureToggle }: any) => (
+  <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
+    <Text className="text-primary text-lg font-bold mb-4">
+      Monitoring & PDF Report Configuration
+    </Text>
+
+    <View className="bg-white rounded-xl shadow-sm border border-accent-100 mb-4">
+      <View className="p-4 border-b border-accent-100">
+        <Text className="text-primary text-lg font-bold">📊 Report Content</Text>
+        <Text className="text-neutral-500 text-sm mt-1">
+          Configure what to include in PDF reports
+        </Text>
+      </View>
+      
+      <View className="p-4">
+        <FeatureToggle
+          label="Include Charts"
+          value={monitoringSettings.includeCharts}
+          onToggle={() => setMonitoringSettings((prev: any) => ({ 
+            ...prev, 
+            includeCharts: !prev.includeCharts 
+          }))}
+          description="Include sales and performance charts in reports"
+        />
+        
+        <FeatureToggle
+          label="Include Data Tables"
+          value={monitoringSettings.includeTables}
+          onToggle={() => setMonitoringSettings((prev: any) => ({ 
+            ...prev, 
+            includeTables: !prev.includeTables 
+          }))}
+          description="Include detailed data tables in reports"
+        />
+        
+        <FeatureToggle
+          label="Include Executive Summary"
+          value={monitoringSettings.includeSummary}
+          onToggle={() => setMonitoringSettings((prev: any) => ({ 
+            ...prev, 
+            includeSummary: !prev.includeSummary 
+          }))}
+          description="Include high-level summary section"
+        />
+        
+        <FeatureToggle
+          label="Include Low Stock Alerts"
+          value={monitoringSettings.includeLowStockAlerts}
+          onToggle={() => setMonitoringSettings((prev: any) => ({ 
+            ...prev, 
+            includeLowStockAlerts: !prev.includeLowStockAlerts 
+          }))}
+          description="Include low stock warnings in reports"
+        />
+        
+        <FeatureToggle
+          label="Include Performance Metrics"
+          value={monitoringSettings.includePerformanceMetrics}
+          onToggle={() => setMonitoringSettings((prev: any) => ({ 
+            ...prev, 
+            includePerformanceMetrics: !prev.includePerformanceMetrics 
+          }))}
+          description="Include KPIs and performance indicators"
+        />
+        
+        <FeatureToggle
+          label="Include Cashier Activity"
+          value={monitoringSettings.includeCashierActivity}
+          onToggle={() => setMonitoringSettings((prev: any) => ({ 
+            ...prev, 
+            includeCashierActivity: !prev.includeCashierActivity 
+          }))}
+          description="Include cashier performance and activity"
+        />
+      </View>
+    </View>
+
+    <View className="bg-white rounded-xl shadow-sm border border-accent-100 mb-4">
+      <View className="p-4 border-b border-accent-100">
+        <Text className="text-primary text-lg font-bold">🔄 Automated Reports</Text>
+        <Text className="text-neutral-500 text-sm mt-1">
+          Configure automatic report generation
+        </Text>
+      </View>
+      
+      <View className="p-4">
+        <FeatureToggle
+          label="Auto-Generate Daily Reports"
+          value={monitoringSettings.autoGenerateDaily}
+          onToggle={() => setMonitoringSettings((prev: any) => ({ 
+            ...prev, 
+            autoGenerateDaily: !prev.autoGenerateDaily 
+          }))}
+          description="Automatically generate daily PDF reports"
+        />
+        
+        <FeatureToggle
+          label="Auto-Generate Weekly Reports"
+          value={monitoringSettings.autoGenerateWeekly}
+          onToggle={() => setMonitoringSettings((prev: any) => ({ 
+            ...prev, 
+            autoGenerateWeekly: !prev.autoGenerateWeekly 
+          }))}
+          description="Automatically generate weekly PDF reports"
+        />
+        
+        <FeatureToggle
+          label="Auto-Generate Monthly Reports"
+          value={monitoringSettings.autoGenerateMonthly}
+          onToggle={() => setMonitoringSettings((prev: any) => ({ 
+            ...prev, 
+            autoGenerateMonthly: !prev.autoGenerateMonthly 
+          }))}
+          description="Automatically generate monthly PDF reports"
+        />
+      </View>
+    </View>
+
+    <View className="bg-white rounded-xl shadow-sm border border-accent-100">
+      <View className="p-4 border-b border-accent-100">
+        <Text className="text-primary text-lg font-bold">📧 Report Distribution</Text>
+        <Text className="text-neutral-500 text-sm mt-1">
+          Configure report security and distribution
+        </Text>
+      </View>
+      
+      <View className="p-4">
+        <FeatureToggle
+          label="Email Reports"
+          value={monitoringSettings.emailReports}
+          onToggle={() => setMonitoringSettings((prev: any) => ({ 
+            ...prev, 
+            emailReports: !prev.emailReports 
+          }))}
+          description="Automatically email generated reports"
+        />
+        
+        {monitoringSettings.emailReports && (
+          <View className="mt-3">
+            <Text className="text-neutral-500 text-sm mb-2">Email Recipients</Text>
+            <TextInput
+              className="bg-neutral-50 border border-accent-100 rounded-lg p-3 text-primary"
+              placeholder="email1@example.com, email2@example.com"
+              value={monitoringSettings.emailRecipients}
+              onChangeText={(text: string) => setMonitoringSettings((prev: any) => ({ 
+                ...prev, 
+                emailRecipients: text 
+              }))}
+            />
+            <Text className="text-neutral-500 text-xs mt-1">
+              Separate multiple emails with commas
+            </Text>
+          </View>
+        )}
+        
+        <View className="mt-4">
+          <Text className="text-neutral-500 text-sm mb-2">Report Password (Optional)</Text>
+          <TextInput
+            className="bg-neutral-50 border border-accent-100 rounded-lg p-3 text-primary"
+            placeholder="Set password for PDF reports"
+            secureTextEntry
+            value={monitoringSettings.reportPassword}
+            onChangeText={(text: string) => setMonitoringSettings((prev: any) => ({ 
+              ...prev, 
+              reportPassword: text 
+            }))}
+          />
+          <Text className="text-neutral-500 text-xs mt-1">
+            Password protect generated PDF reports
+          </Text>
+        </View>
+      </View>
+    </View>
+  </ScrollView>
+);
+
+// Modal Components
+const AddItemModal = ({ showAddItemModal, setShowAddItemModal, newItem, setNewItem, showImageDropdown, setShowImageDropdown, availableImages, selectImage, handleAddItem }: any) => (
+  <Modal
+    visible={showAddItemModal}
+    onClose={() => setShowAddItemModal(false)}
+    title="Add New Item"
+    showCloseButton={true}
+  >
+    <View className="p-4">
+      <View className="bg-white rounded-xl p-4 shadow-sm border border-accent-100">
+        <Text className="text-primary text-lg font-bold mb-3">Item Information</Text>
+        
+        <View className="space-y-4">
+          <View>
+            <Text className="text-neutral-500 text-sm mb-2">Item Key *</Text>
+            <TextInput
+              className="bg-neutral-50 border border-accent-100 rounded-lg p-3 text-primary"
+              placeholder="e.g., xs, small, medium"
+              value={newItem.key}
+              onChangeText={(text) => setNewItem((prev: any) => ({ ...prev, key: text }))}
+            />
+          </View>
+          
+          <View>
+            <Text className="text-neutral-500 text-sm mb-2">Label *</Text>
+            <TextInput
+              className="bg-neutral-50 border border-accent-100 rounded-lg p-3 text-primary"
+              placeholder="e.g., Extra Small, Small, Medium"
+              value={newItem.label}
+              onChangeText={(text) => setNewItem((prev: any) => ({ ...prev, label: text }))}
+            />
+          </View>
+
+          {/* Image Selection Dropdown */}
+          <View>
+            <Text className="text-neutral-500 text-sm mb-2">Select Image</Text>
+            <TouchableOpacity
+              className="bg-neutral-50 border border-accent-100 rounded-lg p-3 flex-row justify-between items-center"
+              onPress={() => setShowImageDropdown(!showImageDropdown)}
+            >
+              <View className="flex-row items-center">
+                <Image
+                  source={newItem.image}
+                  className="w-8 h-8 mr-3"
+                />
+                <Text className="text-primary">
+                  {availableImages.find((img: any) => img.image === newItem.image)?.label || 'Select image'}
+                </Text>
+              </View>
+              <ChevronDown size={16} color="#6B7280" />
+            </TouchableOpacity>
+
+            {/* Dropdown Options */}
+            {showImageDropdown && (
+              <View className="bg-white border border-accent-100 rounded-lg mt-1 max-h-40">
+                <ScrollView>
+                  {availableImages.map((imageItem: any) => (
+                    <TouchableOpacity
+                      key={imageItem.key}
+                      className="flex-row items-center p-3 border-b border-accent-100 last:border-b-0"
+                      onPress={() => selectImage(imageItem)}
+                    >
+                      <Image
+                        source={imageItem.image}
+                        className="w-8 h-8 mr-3"
+                      />
+                      <Text className="text-primary">{imageItem.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+          </View>
+          
+          <View>
+            <Text className="text-neutral-500 text-sm mb-2">Price *</Text>
+            <View className="flex-row items-center">
+              <Text className="text-neutral-500 mr-2">₱</Text>
+              <TextInput
+                className="flex-1 bg-neutral-50 border border-accent-100 rounded-lg p-3 text-primary"
+                placeholder="299"
+                keyboardType="numeric"
+                value={newItem.price.toString()}
+                onChangeText={(text) => setNewItem((prev: any) => ({ ...prev, price: parseInt(text) || 0 }))}
+              />
+            </View>
+          </View>
+        </View>
+        
+        <TouchableOpacity 
+          className="bg-primary rounded-lg py-3 px-4 mt-6 items-center"
+          onPress={handleAddItem}
+        >
+          <Text className="text-white font-semibold text-lg">Add Item</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </Modal>
+);
+
+const AddCollegeModal = ({ showAddCollegeModal, setShowAddCollegeModal, newCollege, setNewCollege, handleAddCollege }: any) => (
+  <Modal
+    visible={showAddCollegeModal}
+    onClose={() => setShowAddCollegeModal(false)}
+    title="Add New College"
+    showCloseButton={true}
+  >
+    <View className="p-4">
+      <View className="bg-white rounded-xl p-4 shadow-sm border border-accent-100">
+        <Text className="text-primary text-lg font-bold mb-3">College Information</Text>
+        
+        <View className="space-y-4">
+          <View>
+            <Text className="text-neutral-500 text-sm mb-2">College ID *</Text>
+            <TextInput
+              className="bg-neutral-50 border border-accent-100 rounded-lg p-3 text-primary"
+              placeholder="e.g., coe, cas, cob"
+              value={newCollege.id}
+              onChangeText={(text) => setNewCollege((prev: any) => ({ ...prev, id: text }))}
+            />
+          </View>
+          
+          <View>
+            <Text className="text-neutral-500 text-sm mb-2">College Name *</Text>
+            <TextInput
+              className="bg-neutral-50 border border-accent-100 rounded-lg p-3 text-primary"
+              placeholder="e.g., College of Engineering"
+              value={newCollege.name}
+              onChangeText={(text) => setNewCollege((prev: any) => ({ ...prev, name: text }))}
+            />
+          </View>
+        </View>
+        
+        <TouchableOpacity 
+          className="bg-primary rounded-lg py-3 px-4 mt-6 items-center"
+          onPress={handleAddCollege}
+        >
+          <Text className="text-white font-semibold text-lg">Add College</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </Modal>
+);
+
+export default Configuration;

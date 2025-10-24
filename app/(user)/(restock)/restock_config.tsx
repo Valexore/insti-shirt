@@ -13,13 +13,13 @@ import {
 import Icon from "react-native-vector-icons/MaterialIcons";
 
 // Import shirt size images (same as in restock.tsx)
-const extraSmallImg = require("../../assets/images/size-shirt/extra-small.png");
-const smallImg = require("../../assets/images/size-shirt/small.png");
-const mediumImg = require("../../assets/images/size-shirt/medium.png");
-const largeImg = require("../../assets/images/size-shirt/large.png");
-const xlImg = require("../../assets/images/size-shirt/extra-large.png");
-const xxlImg = require("../../assets/images/size-shirt/extra-extra-large.png");
-const xxxlImg = require("../../assets/images/size-shirt/extra-extra-extra-large.png");
+const extraSmallImg = require("../../../assets/images/size-shirt/extra-small.png");
+const smallImg = require("../../../assets/images/size-shirt/small.png");
+const mediumImg = require("../../../assets/images/size-shirt/medium.png");
+const largeImg = require("../../../assets/images/size-shirt/large.png");
+const xlImg = require("../../../assets/images/size-shirt/extra-large.png");
+const xxlImg = require("../../../assets/images/size-shirt/extra-extra-large.png");
+const xxxlImg = require("../../../assets/images/size-shirt/extra-extra-extra-large.png");
 
 type SizeKey = "xs" | "small" | "medium" | "large" | "xl" | "xxl" | "xxxl";
 
