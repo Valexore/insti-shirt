@@ -4,7 +4,7 @@
     "slug": "insti-shirt",
     "version": "1.l0ve.her",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/logo-app.png",
     "scheme": "instishirt",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -17,10 +17,8 @@
         "WRITE_EXTERNAL_STORAGE"
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#E6F4FE"
+
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,

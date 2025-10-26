@@ -1,4 +1,6 @@
+// app/(tabs)/index.tsx
 import { useRouter } from 'expo-router';
+import { LogOut } from 'lucide-react-native';
 import React from 'react';
 import {
   Alert,
@@ -7,11 +9,6 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-
-// Sample images - replace with your actual images
-const shirtIcon = require('../../../assets/images/size-shirt/medium.png'); // Using one of your existing images
-const restockIcon = require('../../../assets/images/size-shirt/large.png'); // Using another existing image
-
 
 const index = () => {
   const router = useRouter();
@@ -55,6 +52,24 @@ const index = () => {
     }
   };
 
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: () => {
+            // Navigate directly to your auth login
+            router.replace('/(auth)/login');
+          }
+        }
+      ]
+    );
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'critical': return 'bg-error';
@@ -81,12 +96,23 @@ const index = () => {
 
   return (
     <View className="flex-1 bg-neutral-50">
-      {/* Header */}
+      {/* Header with Logout Button */}
       <View className="bg-primary p-6 pt-12 pb-4">
-        <Text className="text-white text-2xl font-bold">Inventory Dashboard</Text>
-        <Text className="text-accent-100 text-sm mt-1">
-          Welcome back! Here's your inventory overview
-        </Text>
+        <View className="flex-row justify-between items-start">
+          <View className="flex-1">
+            <Text className="text-white text-2xl font-bold">Inventory Dashboard</Text>
+            <Text className="text-accent-100 text-sm mt-1">
+              Welcome back! Here's your inventory overview
+            </Text>
+          </View>
+          
+          <TouchableOpacity 
+            className="bg-white/20 rounded-lg p-2"
+            onPress={handleLogout}
+          >
+            <LogOut size={20} color="white" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
@@ -299,15 +325,13 @@ const index = () => {
                   </Text>
                 </View>
                 
-                <View className={`items-end ${
-                  activity.action === 'restock' ? 'text-success' : 'text-secondary'
-                }`}>
-                  <Text className={`font-bold ${
-                    activity.action === 'restock' ? 'text-success' : 'text-secondary'
-                  }`}>
+                <View className={`items-end ${getActivityColor(activity.action)}`}>
+                  <Text className={`font-bold ${getActivityColor(activity.action)}`}>
                     {activity.action === 'restock' ? '+' : '-'}{activity.items}
                   </Text>
-                  <Text className="text-neutral-500 text-xs">items</Text>
+                  <Text className="text-neutral-500 text-xs">
+                    items
+                  </Text>
                 </View>
               </View>
             ))}

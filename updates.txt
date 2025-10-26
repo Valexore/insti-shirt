@@ -70,3 +70,13 @@ Release 0.0.4 -> 10/5/25
 - Updated dependencies to latest versions
 - Minor UI enhancements and bug fixes
 ----------------------------------------------------------------
+
+
+Release 0.0.5 - 0.0.10a -> 10/6/2025 - 10/25/2025
+ - Added admin panel with user management, report generation, and configuration settings.
+    - Implemented user authentication and role-based access control.
+    - Restructured app navigation to separate admin and user functionalities.
+    - Fixed bugs in shop and restock modules.
+    - Improved UI/UX for better user experience.
+    - Prepared for future updates and scalability.
+----------------------------------------------------------------

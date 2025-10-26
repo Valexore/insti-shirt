@@ -1,6 +1,15 @@
+// app/(tabs)/restock.tsx
 import { router } from "expo-router";
-import React from "react";
-import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { Info } from "lucide-react-native";
+import React, { useState } from "react";
+import {
+  Image,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View
+} from "react-native";
+import Modal from "../../components/Modal";
 
 // These return numbers (image resource IDs), not strings
 const extraSmallImg = require("../../../assets/images/size-shirt/extra-small.png");
@@ -19,6 +28,9 @@ interface StockItem {
   image: number;
   stock: number;
   lowStockThreshold: number;
+  reserved: number;
+  rejected: number;
+  returned: number;
 }
 
 const Restock = () => {
@@ -30,6 +42,9 @@ const Restock = () => {
       image: extraSmallImg,
       stock: 15,
       lowStockThreshold: 5,
+      reserved: 2,
+      rejected: 1,
+      returned: 0
     },
     {
       key: "small",
@@ -37,6 +52,9 @@ const Restock = () => {
       image: smallImg,
       stock: 20,
       lowStockThreshold: 5,
+      reserved: 3,
+      rejected: 0,
+      returned: 1
     },
     {
       key: "medium",
@@ -44,6 +62,9 @@ const Restock = () => {
       image: mediumImg,
       stock: 25,
       lowStockThreshold: 5,
+      reserved: 5,
+      rejected: 2,
+      returned: 0
     },
     {
       key: "large",
@@ -51,6 +72,9 @@ const Restock = () => {
       image: largeImg,
       stock: 18,
       lowStockThreshold: 5,
+      reserved: 4,
+      rejected: 1,
+      returned: 2
     },
     {
       key: "xl",
@@ -58,6 +82,9 @@ const Restock = () => {
       image: xlImg,
       stock: 12,
       lowStockThreshold: 5,
+      reserved: 2,
+      rejected: 3,
+      returned: 1
     },
     {
       key: "xxl",
@@ -65,6 +92,9 @@ const Restock = () => {
       image: xxlImg,
       stock: 8,
       lowStockThreshold: 5,
+      reserved: 1,
+      rejected: 2,
+      returned: 0
     },
     {
       key: "xxxl",
@@ -72,13 +102,24 @@ const Restock = () => {
       image: xxxlImg,
       stock: 3,
       lowStockThreshold: 5,
+      reserved: 0,
+      rejected: 1,
+      returned: 1
     },
   ];
+
+  const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
+  const [showItemModal, setShowItemModal] = useState(false);
 
   // Sample numbers for the new summary stats
   const todaysRestocked = 45; // Total items added to restock today
   const todaysSold = 28; // Total items sold/dropped today
   const totalStock = 101; // Total stock added by user (cumulative)
+  
+  // New metrics
+  const totalReserved = stockData.reduce((sum, item) => sum + item.reserved, 0);
+  const totalRejected = stockData.reduce((sum, item) => sum + item.rejected, 0);
+  const totalReturned = stockData.reduce((sum, item) => sum + item.returned, 0);
 
   const getStockStatusColor = (stock: number, lowStockThreshold: number) => {
     if (stock === 0) return "text-error";
@@ -109,13 +150,22 @@ const Restock = () => {
 
   const handleAddRestock = () => {
     console.log("Navigate to add restock screen");
-    // Navigation logic would go here
+    router.replace('../(restock)/restock_config');
+  };
+
+  const handleItemPress = (item: StockItem) => {
+    setSelectedItem(item);
+    setShowItemModal(true);
+  };
+
+  const formatNumber = (num: number) => {
+    return num.toLocaleString();
   };
 
   return (
     <View className="flex-1 bg-neutral-50">
       {/* Header */}
-      <View className="bg-primary p-4 ">
+      <View className="bg-primary p-4">
         <Text className="text-white text-xl font-bold text-center">
           Stock Management
         </Text>
@@ -179,6 +229,54 @@ const Restock = () => {
               </View>
             </View>
 
+            {/* Additional Metrics Row */}
+            <View className="flex-row justify-between mb-4">
+              {/* Reserved Items */}
+              <View className="items-center flex-1">
+                <View className="bg-blue-100 p-3 rounded-full mb-2">
+                  <Text className="text-blue-600 text-lg font-bold">
+                    {totalReserved}
+                  </Text>
+                </View>
+                <Text className="text-neutral-500 text-xs text-center">
+                  Reserved
+                </Text>
+                <Text className="text-blue-600 text-xs font-medium mt-1">
+                  On hold
+                </Text>
+              </View>
+
+              {/* Rejected Items */}
+              <View className="items-center flex-1">
+                <View className="bg-orange-100 p-3 rounded-full mb-2">
+                  <Text className="text-orange-600 text-lg font-bold">
+                    {totalRejected}
+                  </Text>
+                </View>
+                <Text className="text-neutral-500 text-xs text-center">
+                  Rejected
+                </Text>
+                <Text className="text-orange-600 text-xs font-medium mt-1">
+                  Quality issues
+                </Text>
+              </View>
+
+              {/* Returned Items */}
+              <View className="items-center flex-1">
+                <View className="bg-purple-100 p-3 rounded-full mb-2">
+                  <Text className="text-purple-600 text-lg font-bold">
+                    {totalReturned}
+                  </Text>
+                </View>
+                <Text className="text-neutral-500 text-xs text-center">
+                  Returned
+                </Text>
+                <Text className="text-purple-600 text-xs font-medium mt-1">
+                  Customer returns
+                </Text>
+              </View>
+            </View>
+
             {/* Net Change Indicator */}
             <View className="bg-neutral-50 rounded-lg p-3 mt-2">
               <View className="flex-row justify-between items-center mb-2">
@@ -210,29 +308,8 @@ const Restock = () => {
                 <Text className="text-neutral-500 text-xs">More Restocks</Text>
               </View>
             </View>
-
-            {/* Restock Alert ==> stock alert as future feature
-            {itemsNeedingRestock > 0 && (
-              <View className="bg-warning/10 rounded-lg p-3 mt-3 border border-warning/20">
-                <View className="flex-row items-center">
-                  <Text className="text-warning text-lg mr-2">⚠️</Text>
-                  <View className="flex-1">
-                    <Text className="text-warning font-semibold">
-                      Restock Alert
-                    </Text>
-                    <Text className="text-warning text-xs">
-                      {itemsNeedingRestock} size
-                      {itemsNeedingRestock !== 1 ? "s" : ""} need
-                      {itemsNeedingRestock !== 1 ? "" : "s"} attention
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            )} */}
           </View>
         </View>
-
-
 
         {/* Stock Details Header */}
         <View className="mx-4 mt-6 mb-3">
@@ -240,15 +317,16 @@ const Restock = () => {
             Size-wise Stock Details
           </Text>
           <Text className="text-neutral-500 text-sm">
-            Current inventory levels by size
+            Tap on any size to view detailed information
           </Text>
         </View>
 
         {/* Stock Items List */}
         <View className="mx-4 mb-4">
           {stockData.map((item) => (
-            <View
+            <TouchableOpacity
               key={item.key}
+              onPress={() => handleItemPress(item)}
               className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-accent-100"
             >
               <View className="flex-row items-center justify-between">
@@ -290,8 +368,7 @@ const Restock = () => {
                   </View>
                 </View>
 
-                {/* Stock Count and Progress */}
-
+                {/* Stock Count and Info Icon */}
                 <View className="items-end">
                   <View
                     className={`p-2 rounded-lg ${
@@ -310,6 +387,9 @@ const Restock = () => {
                     <Text className="text-neutral-500 text-xs text-center">
                       units
                     </Text>
+                  </View>
+                  <View className="mt-2 bg-primary/10 rounded-full p-1">
+                    <Info size={14} color="#3B82F6" />
                   </View>
                 </View>
               </View>
@@ -338,22 +418,148 @@ const Restock = () => {
                   <Text className="text-neutral-500 text-xs">30</Text>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
       </ScrollView>
 
-              {/* Add Restock Button */}
-        <View className="p-1 border-t border-accent-100">
-          <TouchableOpacity
-            onPress={() => router.replace('../(restock)/restock_config')}
-            className="rounded-lg py-4 items-center bg-secondary"
-          >
-            <Text className="text-white text-lg font-semibold text-center">
-              📦 Add Restock
-            </Text>
-          </TouchableOpacity>
-        </View>
+      {/* Add Restock Button */}
+      <View className="p-4 border-t border-accent-100 bg-white">
+        <TouchableOpacity
+          onPress={handleAddRestock}
+          className="rounded-lg py-4 items-center bg-secondary"
+        >
+          <Text className="text-white text-lg font-semibold text-center">
+            📦 Add Restock
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Item Detail Modal */}
+      <Modal
+        visible={showItemModal}
+        onClose={() => setShowItemModal(false)}
+        title={selectedItem ? `${selectedItem.label} Details` : "Item Details"}
+        showCloseButton={true}
+      >
+        {selectedItem && (
+          <View className="p-4">
+            <View className="bg-white rounded-xl p-4 shadow-sm border border-accent-100">
+              {/* Header with Image */}
+              <View className="flex-row items-center mb-4">
+                <View className="w-20 h-20 bg-neutral-50 rounded-lg border border-accent-100 overflow-hidden items-center justify-center">
+                  <Image
+                    source={selectedItem.image}
+                    className="w-16 h-16"
+                    resizeMode="contain"
+                  />
+                </View>
+                <View className="ml-4 flex-1">
+                  <Text className="text-primary text-xl font-bold">
+                    {selectedItem.label}
+                  </Text>
+                  <Text className="text-neutral-500">
+                    Size: {selectedItem.key.toUpperCase()}
+                  </Text>
+                  <View className={`px-2 py-1 rounded-full mt-1 ${
+                    selectedItem.stock === 0
+                      ? "bg-error/20"
+                      : selectedItem.stock <= selectedItem.lowStockThreshold
+                        ? "bg-warning/20"
+                        : "bg-success/20"
+                  }`}>
+                    <Text className={`text-xs font-medium ${
+                      selectedItem.stock === 0
+                        ? "text-error"
+                        : selectedItem.stock <= selectedItem.lowStockThreshold
+                          ? "text-warning"
+                          : "text-success"
+                    }`}>
+                      {getStockStatusText(selectedItem.stock, selectedItem.lowStockThreshold)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Stock Information Grid */}
+              <View className="grid grid-cols-2 gap-3 mb-4">
+                {/* Current Stock */}
+                <View className="bg-primary/5 rounded-lg p-3">
+                  <Text className="text-neutral-500 text-xs mb-1">Current Stock</Text>
+                  <Text className="text-primary text-2xl font-bold">
+                    {formatNumber(selectedItem.stock)}
+                  </Text>
+                  <Text className="text-neutral-500 text-xs">units available</Text>
+                </View>
+
+                {/* Reserved Items */}
+                <View className="bg-blue-50 rounded-lg p-3">
+                  <Text className="text-neutral-500 text-xs mb-1">Reserved Items</Text>
+                  <Text className="text-blue-600 text-2xl font-bold">
+                    {formatNumber(selectedItem.reserved)}
+                  </Text>
+                  <Text className="text-neutral-500 text-xs">on hold</Text>
+                </View>
+
+                {/* Rejected Items */}
+                <View className="bg-orange-50 rounded-lg p-3">
+                  <Text className="text-neutral-500 text-xs mb-1">Rejected Items</Text>
+                  <Text className="text-orange-600 text-2xl font-bold">
+                    {formatNumber(selectedItem.rejected)}
+                  </Text>
+                  <Text className="text-neutral-500 text-xs">quality issues</Text>
+                </View>
+
+                {/* Returned Items */}
+                <View className="bg-purple-50 rounded-lg p-3">
+                  <Text className="text-neutral-500 text-xs mb-1">Returned Items</Text>
+                  <Text className="text-purple-600 text-2xl font-bold">
+                    {formatNumber(selectedItem.returned)}
+                  </Text>
+                  <Text className="text-neutral-500 text-xs">customer returns</Text>
+                </View>
+              </View>
+
+              {/* Stock Level Progress */}
+              <View className="bg-neutral-50 rounded-lg p-4 mb-4">
+                <Text className="text-primary font-semibold mb-2">Stock Level</Text>
+                <View className="flex-row justify-between mb-1">
+                  <Text className="text-neutral-500 text-sm">Current: {selectedItem.stock} units</Text>
+                  <Text className="text-neutral-500 text-sm">
+                    {getStockPercentage(selectedItem.stock).toFixed(0)}%
+                  </Text>
+                </View>
+                <View className="w-full bg-accent-100 rounded-full h-4">
+                  <View
+                    className={`h-4 rounded-full ${getProgressBarColor(selectedItem.stock, selectedItem.lowStockThreshold)}`}
+                    style={{
+                      width: `${getStockPercentage(selectedItem.stock)}%`,
+                    }}
+                  />
+                </View>
+                <View className="flex-row justify-between mt-2">
+                  <Text className="text-neutral-500 text-xs">Empty</Text>
+                  <Text className="text-warning text-xs">
+                    Low: {selectedItem.lowStockThreshold}
+                  </Text>
+                  <Text className="text-neutral-500 text-xs">Full (30)</Text>
+                </View>
+              </View>
+
+              {/* Available for Sale */}
+              <View className="bg-success/10 rounded-lg p-4 border border-success/20">
+                <Text className="text-success font-semibold mb-1">Available for Sale</Text>
+                <Text className="text-success text-2xl font-bold">
+                  {formatNumber(selectedItem.stock - selectedItem.reserved)} units
+                </Text>
+                <Text className="text-success text-xs">
+                  Current stock minus reserved items
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+      </Modal>
     </View>
   );
 };

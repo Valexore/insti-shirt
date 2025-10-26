@@ -1,121 +1,65 @@
-import * as Print from 'expo-print';
-import { useRouter } from 'expo-router';
-import * as Sharing from 'expo-sharing';
-import React, { useState } from 'react';
-import {
-  Alert,
-  Dimensions,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View
-} from 'react-native';
-
-const { width: screenWidth } = Dimensions.get('window');
+// app/(tabs)/analytics.tsx
+import * as FileSystem from "expo-file-system/legacy";
+import * as Print from "expo-print";
+import { useRouter } from "expo-router";
+import * as Sharing from "expo-sharing";
+import React, { useState } from "react";
+import { Alert, Platform, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 const Analytics = () => {
   const router = useRouter();
-  const [timeRange, setTimeRange] = useState<'week' | 'month' | 'quarter'>('week');
   const [isPrinting, setIsPrinting] = useState(false);
 
-  // Sample analytics data with Philippine Peso
+  // Sample analytics data - all hardcoded for now
   const analyticsData = {
     overview: {
       totalRevenue: 12540,
       totalItemsSold: 342,
       averageSale: 36.67,
-      restockCost: 8450,
       profit: 4090,
-      profitMargin: 32.6
+      profitMargin: 32.6,
     },
-    
-    salesData: {
-      week: [1250, 1890, 1420, 2100, 1780, 1950, 2250],
-      month: [12540, 11870, 14200, 15680],
-      quarter: [45200, 48900, 51200, 52500]
+
+    todayStats: {
+      sales: 28,
+      revenue: 8372,
+      restocks: 45,
+      rejected: 3,
+      returned: 2,
     },
-    
-    restockData: {
-      week: [45, 28, 35, 52, 40, 38, 45],
-      month: [200, 185, 220, 240],
-      quarter: [850, 920, 880, 950]
-    },
-    
+
     topSellingSizes: [
-      { size: 'Medium', sold: 89, revenue: 3204, percentage: 26 },
-      { size: 'Large', sold: 76, revenue: 2736, percentage: 22 },
-      { size: 'Small', sold: 65, revenue: 2340, percentage: 19 },
-      { size: 'XL', sold: 52, revenue: 1872, percentage: 15 },
-      { size: 'XXL', sold: 35, revenue: 1260, percentage: 10 },
-      { size: 'XS', sold: 18, revenue: 648, percentage: 5 },
-      { size: 'XXXL', sold: 7, revenue: 252, percentage: 3 }
+      { size: "Medium", sold: 89, revenue: 3204, percentage: 26 },
+      { size: "Large", sold: 76, revenue: 2736, percentage: 22 },
+      { size: "Small", sold: 65, revenue: 2340, percentage: 19 },
+      { size: "XL", sold: 52, revenue: 1872, percentage: 15 },
     ],
-    
-    stockTurnover: [
-      { size: 'Medium', turnover: 3.2, days: 9.4 },
-      { size: 'Large', turnover: 2.8, days: 10.7 },
-      { size: 'Small', turnover: 2.5, days: 12.0 },
-      { size: 'XL', turnover: 2.1, days: 14.3 },
-      { size: 'XXL', turnover: 1.8, days: 16.7 },
-      { size: 'XS', turnover: 1.2, days: 25.0 },
-      { size: 'XXXL', turnover: 0.8, days: 37.5 }
-    ],
-    
+
     performanceMetrics: {
       sellThroughRate: 76.4,
       stockoutFrequency: 12.3,
-      grossMarginReturn: 4.2,
-      inventoryAccuracy: 94.7
-    }
+      inventoryAccuracy: 94.7,
+    },
   };
 
-  const formatCurrency = (amount: number) => {
-    return `₱${amount.toLocaleString()}`;
-  };
-
-  const formatNumber = (number: number) => {
-    return number.toLocaleString();
-  };
-
-  const generatePDF = async () => {
-    try {
-      setIsPrinting(true);
-
-      const htmlContent = generateHTMLContent();
-      
-      // Generate PDF using expo-print
-      const { uri } = await Print.printToFileAsync({
-        html: htmlContent,
-        base64: false
-      });
-
-      // Share the PDF file
-      await Sharing.shareAsync(uri, {
-        mimeType: 'application/pdf',
-        dialogTitle: 'Inventory Analytics Report',
-        UTI: 'com.adobe.pdf'
-      });
-
-      Alert.alert('Success', 'PDF report generated and ready to share!');
-      
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      Alert.alert('Error', 'Failed to generate PDF report. Please try again.');
-    } finally {
-      setIsPrinting(false);
-    }
-  };
-
-  const generateHTMLContent = () => {
+  // PDF Generator function (moved from analyticsPdfGenerator.tsx)
+  const generateAnalyticsPDF = ({ analyticsData }: { analyticsData: any }) => {
     const timestamp = new Date().toLocaleString();
-    const timeRangeLabel = timeRange.charAt(0).toUpperCase() + timeRange.slice(1);
     
+    const formatCurrency = (amount: number) => {
+      return `₱${amount.toLocaleString()}`;
+    };
+
+    const formatNumber = (number: number) => {
+      return number.toLocaleString();
+    };
+
     return `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8">
-        <title>Inventory Analytics Report</title>
+        <title>Sales Analytics Report</title>
         <style>
           body {
             font-family: Arial, sans-serif;
@@ -132,11 +76,6 @@ const Analytics = () => {
             margin: 0;
             font-size: 24px;
             color: #2c5aa0;
-          }
-          .header h2 {
-            margin: 5px 0;
-            font-size: 18px;
-            color: #666;
           }
           .info-row {
             display: flex;
@@ -195,16 +134,10 @@ const Analytics = () => {
           }
           .text-right {
             text-align: right;
+            font-weight: bold;
           }
           .text-center {
             text-align: center;
-          }
-          .text-bold {
-            font-weight: bold;
-          }
-          .total-row {
-            background-color: #f0f0f0;
-            font-weight: bold;
           }
           .footer {
             margin-top: 30px;
@@ -213,18 +146,14 @@ const Analytics = () => {
             font-size: 10px;
             color: #666;
           }
-          .performance-good { color: #28a745; }
-          .performance-warning { color: #ffc107; }
-          .performance-poor { color: #dc3545; }
         </style>
       </head>
       <body>
         <div class="header">
-          <h1>INVENTORY ANALYTICS REPORT</h1>
-          <h2>Performance Insights and Inventory Metrics</h2>
+          <h1>SALES ANALYTICS REPORT</h1>
           <div class="info-row">
             <div>Generated on: ${timestamp}</div>
-            <div>Time Range: ${timeRangeLabel}</div>
+            <div>Period: Today</div>
           </div>
         </div>
 
@@ -235,62 +164,53 @@ const Analytics = () => {
             <div class="stat-card">
               <div class="stat-label">Total Revenue</div>
               <div class="stat-value">${formatCurrency(analyticsData.overview.totalRevenue)}</div>
-              <div style="color: #28a745; font-size: 10px;">↑ 12.4% from last ${timeRange}</div>
             </div>
             <div class="stat-card">
               <div class="stat-label">Items Sold</div>
               <div class="stat-value">${formatNumber(analyticsData.overview.totalItemsSold)}</div>
-              <div style="color: #28a745; font-size: 10px;">↑ 8.2% from last ${timeRange}</div>
             </div>
             <div class="stat-card">
               <div class="stat-label">Profit</div>
               <div class="stat-value">${formatCurrency(analyticsData.overview.profit)}</div>
-              <div style="color: #28a745; font-size: 10px;">${analyticsData.overview.profitMargin}% margin</div>
             </div>
             <div class="stat-card">
               <div class="stat-label">Average Sale</div>
               <div class="stat-value">₱${analyticsData.overview.averageSale.toFixed(2)}</div>
-              <div style="color: #ffc107; font-size: 10px;">↓ 2.1% from last ${timeRange}</div>
             </div>
           </div>
         </div>
 
-        <!-- Performance Metrics -->
+        <!-- Today's Performance -->
         <div class="section">
-          <div class="section-title">PERFORMANCE METRICS</div>
+          <div class="section-title">TODAY'S PERFORMANCE</div>
           <table>
             <thead>
               <tr>
                 <th>Metric</th>
                 <th>Value</th>
-                <th>Target</th>
-                <th>Status</th>
+                <th>Details</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td>Sell-Through Rate</td>
-                <td>${analyticsData.performanceMetrics.sellThroughRate}%</td>
-                <td>>70%</td>
-                <td class="performance-good">Excellent</td>
+                <td>Today's Sales</td>
+                <td class="text-right">${analyticsData.todayStats.sales}</td>
+                <td>${formatCurrency(analyticsData.todayStats.revenue)} revenue</td>
               </tr>
               <tr>
-                <td>Stockout Frequency</td>
-                <td>${analyticsData.performanceMetrics.stockoutFrequency}%</td>
-                <td><10%</td>
-                <td class="performance-warning">Needs Improvement</td>
+                <td>Restocks</td>
+                <td class="text-right">${analyticsData.todayStats.restocks}</td>
+                <td>Items added to inventory</td>
               </tr>
               <tr>
-                <td>GMROI</td>
-                <td>${analyticsData.performanceMetrics.grossMarginReturn}x</td>
-                <td>>3x</td>
-                <td class="performance-good">Good</td>
+                <td>Rejected Items</td>
+                <td class="text-right">${analyticsData.todayStats.rejected}</td>
+                <td>Quality control issues</td>
               </tr>
               <tr>
-                <td>Inventory Accuracy</td>
-                <td>${analyticsData.performanceMetrics.inventoryAccuracy}%</td>
-                <td>>95%</td>
-                <td class="performance-good">High</td>
+                <td>Returned Items</td>
+                <td class="text-right">${analyticsData.todayStats.returned}</td>
+                <td>Customer returns</td>
               </tr>
             </tbody>
           </table>
@@ -309,7 +229,7 @@ const Analytics = () => {
               </tr>
             </thead>
             <tbody>
-              ${analyticsData.topSellingSizes.map(item => `
+              ${analyticsData.topSellingSizes.map((item: any) => `
                 <tr>
                   <td>${item.size}</td>
                   <td class="text-right">${formatNumber(item.sold)}</td>
@@ -317,81 +237,36 @@ const Analytics = () => {
                   <td class="text-right">${item.percentage}%</td>
                 </tr>
               `).join('')}
-              <tr class="total-row">
-                <td>TOTAL</td>
-                <td class="text-right">${formatNumber(analyticsData.topSellingSizes.reduce((sum, item) => sum + item.sold, 0))}</td>
-                <td class="text-right">${formatCurrency(analyticsData.topSellingSizes.reduce((sum, item) => sum + item.revenue, 0))}</td>
-                <td class="text-right">100%</td>
-              </tr>
             </tbody>
           </table>
         </div>
 
-        <!-- Stock Turnover -->
+        <!-- Performance Metrics -->
         <div class="section">
-          <div class="section-title">STOCK TURNOVER RATES</div>
+          <div class="section-title">PERFORMANCE METRICS</div>
           <table>
             <thead>
               <tr>
-                <th>Size</th>
-                <th>Turnover Rate</th>
-                <th>Days Inventory</th>
-                <th>Performance</th>
+                <th>Metric</th>
+                <th>Value</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
-              ${analyticsData.stockTurnover.map(item => {
-                const performance = item.turnover >= 2.5 ? 'performance-good' : 
-                                  item.turnover >= 1.5 ? 'performance-warning' : 'performance-poor';
-                const performanceText = item.turnover >= 2.5 ? 'Excellent' : 
-                                      item.turnover >= 1.5 ? 'Good' : 'Needs Attention';
-                return `
-                  <tr>
-                    <td>${item.size}</td>
-                    <td class="text-right">${item.turnover}x</td>
-                    <td class="text-right">${item.days}</td>
-                    <td class="${performance}">${performanceText}</td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Sales Data -->
-        <div class="section">
-          <div class="section-title">SALES DATA - ${timeRangeLabel.toUpperCase()}</div>
-          <table>
-            <thead>
               <tr>
-                <th>Period</th>
-                <th>Sales</th>
-                <th>Restock Units</th>
-                <th>Net Change</th>
+                <td>Sell-Through Rate</td>
+                <td class="text-right">${analyticsData.performanceMetrics.sellThroughRate}%</td>
+                <td>Excellent</td>
               </tr>
-            </thead>
-            <tbody>
-              ${getTimeLabels(timeRange).map((label, index) => {
-                const sales = analyticsData.salesData[timeRange][index];
-                const restock = analyticsData.restockData[timeRange][index];
-                const netChange = sales - (restock * 25); // Sample calculation
-                return `
-                  <tr>
-                    <td>${label}</td>
-                    <td class="text-right">${formatCurrency(sales)}</td>
-                    <td class="text-right">${formatNumber(restock)}</td>
-                    <td class="text-right">${formatCurrency(netChange)}</td>
-                  </tr>
-                `;
-              }).join('')}
-              <tr class="total-row">
-                <td>TOTAL</td>
-                <td class="text-right">${formatCurrency(analyticsData.salesData[timeRange].reduce((a, b) => a + b, 0))}</td>
-                <td class="text-right">${formatNumber(analyticsData.restockData[timeRange].reduce((a, b) => a + b, 0))}</td>
-                <td class="text-right">${formatCurrency(
-                  analyticsData.salesData[timeRange].reduce((a, b) => a + b, 0) - 
-                  (analyticsData.restockData[timeRange].reduce((a, b) => a + b, 0) * 25)
-                )}</td>
+              <tr>
+                <td>Stockout Frequency</td>
+                <td class="text-right">${analyticsData.performanceMetrics.stockoutFrequency}%</td>
+                <td>Needs Improvement</td>
+              </tr>
+              <tr>
+                <td>Inventory Accuracy</td>
+                <td class="text-right">${analyticsData.performanceMetrics.inventoryAccuracy}%</td>
+                <td>High</td>
               </tr>
             </tbody>
           </table>
@@ -406,288 +281,377 @@ const Analytics = () => {
     `;
   };
 
-  const getTimeLabels = (range: string) => {
-    switch (range) {
-      case 'week':
-        return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      case 'month':
-        return ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
-      case 'quarter':
-        return ['Q1', 'Q2', 'Q3', 'Q4'];
-      default:
+  const formatCurrency = (amount: number) => {
+    return `₱${amount.toLocaleString()}`;
+  };
+
+  const formatNumber = (number: number) => {
+    return number.toLocaleString();
+  };
+
+  const generatePDF = async () => {
+    try {
+      setIsPrinting(true);
+
+      const now = new Date();
+      const month = String(now.getMonth() + 1).padStart(2, "0"); 
+      const day = String(now.getDate()).padStart(2, "0");
+      const year = now.getFullYear();
+
+      const dateStr = `${month}-${day}-${year}`;
+      const timeStr = now.toTimeString().split(" ")[0].replace(/:/g, "");
+      const fileName = `sale_stock_report_${dateStr}_${timeStr}.pdf`;
+
+      const htmlContent = generateAnalyticsPDF({ analyticsData });
+
+      // Generate PDF
+      const { uri } = await Print.printToFileAsync({
+        html: htmlContent,
+        base64: false,
+      });
+
+      if (!FileSystem.documentDirectory) {
+        throw new Error("Document directory not available");
+      }
+
+      // Define destination path
+      const documentsDir = FileSystem.documentDirectory;
+      const destinationUri = `${documentsDir}${fileName}`;
+
+      // Copy the file to documents directory
+      await FileSystem.copyAsync({
+        from: uri,
+        to: destinationUri,
+      });
+
+      // Clean up the temporary file
+      try {
+        await FileSystem.deleteAsync(uri);
+      } catch (error) {
+        console.log('Could not delete temporary file:', error);
+      }
+
+      // Show success message with options
+      Alert.alert(
+        "PDF Saved Successfully!",
+        `File saved as: ${fileName}\n\nWhat would you like to do?`,
+        [
+          {
+            text: "View PDF Now",
+            onPress: () => viewPDF(destinationUri),
+          },
+          {
+            text: "View Saved Reports",
+            onPress: () => viewSavedPDFs(),
+          },
+          {
+            text: "OK",
+            style: "cancel",
+          },
+        ]
+      );
+
+      console.log("PDF saved to:", destinationUri);
+    } catch (error: any) {
+      console.error("Error saving PDF:", error);
+      Alert.alert("Error", `Failed to save PDF report: ${error.message}`, [
+        { text: "OK" },
+      ]);
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  const viewPDF = async (pdfUri: string) => {
+    try {
+      // This will show "Share via" but it's intentional for viewing
+      await Sharing.shareAsync(pdfUri, {
+        mimeType: "application/pdf",
+        dialogTitle: "View Sales Report",
+        UTI: "com.adobe.pdf",
+      });
+    } catch (error) {
+      console.error("Error viewing PDF:", error);
+      Alert.alert(
+        "Cannot Open PDF",
+        "PDF viewer not available on this device. The file has been saved to your device storage.",
+        [{ text: "OK" }]
+      );
+    }
+  };
+
+  const getSavedPDFs = async () => {
+    try {
+      if (!FileSystem.documentDirectory) {
         return [];
+      }
+
+      const files = await FileSystem.readDirectoryAsync(
+        FileSystem.documentDirectory
+      );
+      const pdfFiles = files
+        .filter(
+          (file) =>
+            file.endsWith(".pdf") && file.startsWith("sale_stock_report_")
+        )
+        .map((file) => ({
+          name: file,
+          uri: `${FileSystem.documentDirectory}${file}`,
+        }))
+        .sort((a, b) => b.name.localeCompare(a.name));
+
+      return pdfFiles;
+    } catch (error) {
+      console.error("Error reading saved PDFs:", error);
+      return [];
     }
   };
 
-  const getBarWidth = (value: number, max: number) => {
-    return (value / max) * (screenWidth - 120);
+  const viewSavedPDFs = async () => {
+    try {
+      const savedPDFs = await getSavedPDFs();
+
+      if (savedPDFs.length === 0) {
+        Alert.alert(
+          "No Saved Reports",
+          "You haven't saved any PDF reports yet.",
+          [{ text: "OK" }]
+        );
+        return;
+      }
+
+      // Create a list of PDF files for selection
+      const pdfOptions: any[] = savedPDFs.map((pdf) => {
+        const filename = pdf.name.replace("sale_stock_report_", "").replace(".pdf", "");
+        const [datePart, timePart] = filename.split("_");
+        
+        // Format: MM-DD-YYYY HH:MM:SS
+        const formattedName = `${datePart} ${timePart.substring(0, 2)}:${timePart.substring(2, 4)}:${timePart.substring(4, 6)}`;
+        
+        return {
+          text: formattedName,
+          onPress: () => viewPDF(pdf.uri),
+        };
+      });
+
+      // Add cancel option
+      pdfOptions.push({
+        text: "Cancel",
+        style: "cancel",
+      });
+
+      Alert.alert("Saved Reports", "Select a report to view:", pdfOptions);
+    } catch (error) {
+      console.error("Error viewing saved PDFs:", error);
+      Alert.alert("Error", "Failed to load saved reports.", [{ text: "OK" }]);
+    }
   };
 
-  const getPerformanceColor = (value: number, type: 'positive' | 'negative') => {
-    if (type === 'positive') {
-      if (value >= 80) return 'text-success';
-      if (value >= 60) return 'text-warning';
-      return 'text-error';
+  // Function to get the actual file path for user reference
+  const getStorageLocation = () => {
+    if (Platform.OS === 'ios') {
+      return 'Files app > On My iPhone > Your App Name';
     } else {
-      if (value <= 5) return 'text-success';
-      if (value <= 15) return 'text-warning';
-      return 'text-error';
+      return 'Internal Storage > Android > data > your.package.name > files';
     }
   };
 
-  const SimpleBarChart = ({ data, labels, color = 'primary' }: any) => {
-    const maxValue = Math.max(...data);
-    
-    return (
-      <View className="mt-4">
-        <View className="flex-row justify-between items-end h-32 mb-2">
-          {data.map((value: number, index: number) => (
-            <View key={index} className="items-center flex-1">
-              <View 
-                className={`bg-${color} rounded-t-lg`}
-                style={{
-                  height: (value / maxValue) * 80,
-                  width: (screenWidth - 80) / data.length - 4
-                }}
-              />
-              <Text className="text-neutral-500 text-xs mt-1 text-center">
-                {labels[index]}
-              </Text>
-            </View>
-          ))}
-        </View>
+  const StatCard = ({ title, value, subtitle, color = "primary" }: any) => (
+    <View className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-accent-100">
+      <Text className="text-neutral-500 text-sm">{title}</Text>
+      <Text className={`text-${color} text-xl font-bold mt-1`}>{value}</Text>
+      {subtitle && (
+        <Text className="text-success text-xs font-medium mt-1">
+          {subtitle}
+        </Text>
+      )}
+    </View>
+  );
+
+  const QuickActionCard = ({
+    title,
+    subtitle,
+    count,
+    color,
+    emoji,
+    onPress,
+  }: any) => (
+    <TouchableOpacity className="w-[48%] mb-3" onPress={onPress}>
+      <View className="bg-white rounded-xl p-4 shadow-sm border border-accent-100 items-center">
+        <Text className="text-lg">{emoji}</Text>
+        <Text className={`font-semibold mt-2 ${color}`}>{title}</Text>
+        <Text className="text-neutral-500 text-sm text-center mt-1">
+          {count} today
+        </Text>
+        <Text className="text-neutral-400 text-xs text-center mt-1">
+          {subtitle}
+        </Text>
       </View>
-    );
-  };
+    </TouchableOpacity>
+  );
 
   return (
     <View className="flex-1 bg-neutral-50">
       {/* Header */}
       <View className="bg-primary p-4">
         <Text className="text-white text-xl font-bold text-center">
-          Analytics Dashboard
+          Sales Analytics
         </Text>
         <Text className="text-accent-100 text-sm text-center mt-1">
-          Performance insights and inventory metrics
+          Today's performance overview
         </Text>
       </View>
 
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        {/* Time Range Selector */}
-        <View className="mx-4 mt-4">
-          <View className="bg-white rounded-lg p-1 flex-row border border-accent-100">
-            {(['week', 'month', 'quarter'] as const).map((range) => (
-              <TouchableOpacity
-                key={range}
-                className={`flex-1 py-2 rounded-md ${
-                  timeRange === range ? 'bg-primary' : 'bg-transparent'
-                }`}
-                onPress={() => setTimeRange(range)}
-              >
-                <Text
-                  className={`text-center font-medium ${
-                    timeRange === range ? 'text-white' : 'text-neutral-500'
-                  }`}
-                >
-                  {range.charAt(0).toUpperCase() + range.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Overview Cards */}
-        <View className="mx-4 mt-4">
+      <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
+        {/* Today's Overview */}
+        <View className="mb-6">
           <Text className="text-primary text-lg font-bold mb-3">
-            Financial Overview
+            Today's Overview
           </Text>
-          
+
           <View className="flex-row flex-wrap justify-between">
-            <View className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-accent-100 w-[48%]">
-              <Text className="text-neutral-500 text-sm">Total Revenue</Text>
-              <Text className="text-primary text-xl font-bold mt-1">
-                {formatCurrency(analyticsData.overview.totalRevenue)}
-              </Text>
-              <Text className="text-success text-xs font-medium mt-1">
-                ↑ 12.4% from last {timeRange}
-              </Text>
+            <View className="w-[48%]">
+              <StatCard
+                title="Today's Sales"
+                value={analyticsData.todayStats.sales}
+                subtitle={`${formatCurrency(analyticsData.todayStats.revenue)} revenue`}
+                color="secondary"
+              />
             </View>
 
-            <View className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-accent-100 w-[48%]">
-              <Text className="text-neutral-500 text-sm">Items Sold</Text>
-              <Text className="text-secondary text-xl font-bold mt-1">
-                {analyticsData.overview.totalItemsSold}
-              </Text>
-              <Text className="text-success text-xs font-medium mt-1">
-                ↑ 8.2% from last {timeRange}
-              </Text>
+            <View className="w-[48%]">
+              <StatCard
+                title="Items Sold"
+                value={analyticsData.overview.totalItemsSold}
+                subtitle="Total this month"
+                color="primary"
+              />
             </View>
 
-            <View className="bg-white rounded-xl p-4 shadow-sm border border-accent-100 w-[48%]">
-              <Text className="text-neutral-500 text-sm">Profit</Text>
-              <Text className="text-success text-xl font-bold mt-1">
-                {formatCurrency(analyticsData.overview.profit)}
-              </Text>
-              <Text className="text-success text-xs font-medium mt-1">
-                {analyticsData.overview.profitMargin}% margin
-              </Text>
+            <View className="w-[48%]">
+              <StatCard
+                title="Total Revenue"
+                value={formatCurrency(analyticsData.overview.totalRevenue)}
+                subtitle={`${analyticsData.overview.profitMargin}% profit margin`}
+                color="success"
+              />
             </View>
 
-            <View className="bg-white rounded-xl p-4 shadow-sm border border-accent-100 w-[48%]">
-              <Text className="text-neutral-500 text-sm">Avg. Sale</Text>
-              <Text className="text-tertiary text-xl font-bold mt-1">
-                ₱{analyticsData.overview.averageSale}
-              </Text>
-              <Text className="text-warning text-xs font-medium mt-1">
-                ↓ 2.1% from last {timeRange}
-              </Text>
+            <View className="w-[48%]">
+              <StatCard
+                title="Average Sale"
+                value={`₱${analyticsData.overview.averageSale}`}
+                subtitle="Per transaction"
+                color="tertiary"
+              />
             </View>
           </View>
         </View>
 
-        {/* Sales Chart */}
-        <View className="mx-4 mt-6 bg-white rounded-xl p-4 shadow-sm border border-accent-100">
-          <View className="flex-row justify-between items-center mb-2">
-            <Text className="text-primary text-lg font-bold">Sales Performance</Text>
-            <Text className="text-success text-sm font-medium">
-              +12.4% growth
-            </Text>
-          </View>
-          <SimpleBarChart 
-            data={analyticsData.salesData[timeRange]}
-            labels={getTimeLabels(timeRange)}
-            color="primary"
-          />
-        </View>
+        {/* Quick Actions */}
+        <View className="mb-6">
+          <Text className="text-primary text-lg font-bold mb-3">
+            Quick Views
+          </Text>
 
-        {/* Restock Chart */}
-        <View className="mx-4 mt-4 bg-white rounded-xl p-4 shadow-sm border border-accent-100">
-          <View className="flex-row justify-between items-center mb-2">
-            <Text className="text-primary text-lg font-bold">Restock Activity</Text>
-            <Text className="text-secondary text-sm font-medium">
-              {analyticsData.restockData[timeRange].reduce((a, b) => a + b, 0)} units
-            </Text>
+          <View className="flex-row flex-wrap justify-between">
+            <QuickActionCard
+              title="Rejected Items"
+              subtitle="View detailed history"
+              count={analyticsData.todayStats.rejected}
+              color="text-orange-500"
+              emoji="⚠️"
+              onPress={() => router.push("../(analytics)/history_rejected")}
+            />
+
+            <QuickActionCard
+              title="Returned Items"
+              subtitle="View exchange details"
+              count={analyticsData.todayStats.returned}
+              color="text-purple-500"
+              emoji="🔄"
+              onPress={() => router.push("../(analytics)/history_returned")}
+            />
+
+            <QuickActionCard
+              title="Restock History"
+              subtitle="View supplier orders"
+              count={analyticsData.todayStats.restocks}
+              color="text-blue-500"
+              emoji="📦"
+              onPress={() => router.push("../(analytics)/history_restock")}
+            />
+
+            <QuickActionCard
+              title="Live Sales"
+              subtitle="View real-time data"
+              count="Live"
+              color="text-green-500"
+              emoji="📊"
+              onPress={() => router.push("../(tabs)/shop")}
+            />
           </View>
-          <SimpleBarChart 
-            data={analyticsData.restockData[timeRange]}
-            labels={getTimeLabels(timeRange)}
-            color="secondary"
-          />
         </View>
 
         {/* Top Selling Sizes */}
-        <View className="mx-4 mt-4 bg-white rounded-xl p-4 shadow-sm border border-accent-100">
-          <Text className="text-primary text-lg font-bold mb-4">
+        <View className="mb-6">
+          <Text className="text-primary text-lg font-bold mb-3">
             Top Selling Sizes
           </Text>
-          
-          {analyticsData.topSellingSizes.map((item, index) => (
-            <View key={item.size} className="mb-3">
-              <View className="flex-row justify-between items-center mb-1">
-                <Text className="text-primary font-medium">{item.size}</Text>
-                <View className="flex-row items-center">
-                  <Text className="text-neutral-500 text-sm mr-2">
+
+          <View className="bg-white rounded-xl p-4 shadow-sm border border-accent-100">
+            {analyticsData.topSellingSizes.map((item, index) => (
+              <View
+                key={item.size}
+                className={`flex-row justify-between items-center py-3 ${index < analyticsData.topSellingSizes.length - 1 ? "border-b border-accent-100" : ""}`}
+              >
+                <View className="flex-row items-center flex-1">
+                  <View className="w-8 h-8 bg-primary/10 rounded-full items-center justify-center mr-3">
+                    <Text className="text-primary font-bold text-xs">
+                      {item.size.charAt(0)}
+                    </Text>
+                  </View>
+                  <Text className="text-primary font-medium">{item.size}</Text>
+                </View>
+
+                <View className="items-end">
+                  <Text className="text-primary font-semibold">
                     {item.sold} sold
                   </Text>
-                  <Text className="text-success font-semibold">
+                  <Text className="text-success text-xs">
                     {formatCurrency(item.revenue)}
                   </Text>
                 </View>
               </View>
-              
-              <View className="w-full bg-accent-100 rounded-full h-2">
-                <View 
-                  className="bg-primary h-2 rounded-full"
-                  style={{ width: `${item.percentage}%` }}
-                />
-              </View>
-              
-              <Text className="text-neutral-500 text-xs mt-1">
-                {item.percentage}% of total sales
-              </Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Stock Turnover */}
-        <View className="mx-4 mt-4 bg-white rounded-xl p-4 shadow-sm border border-accent-100">
-          <Text className="text-primary text-lg font-bold mb-4">
-            Stock Turnover Rate
-          </Text>
-          
-          {analyticsData.stockTurnover.map((item) => (
-            <View key={item.size} className="flex-row justify-between items-center py-2 border-b border-accent-100 last:border-b-0">
-              <Text className="text-primary font-medium flex-1">{item.size}</Text>
-              
-              <View className="flex-row items-center flex-1 justify-end">
-                <View className="items-center mr-4">
-                  <Text className="text-neutral-500 text-xs">Rate</Text>
-                  <Text className={`font-bold ${
-                    item.turnover >= 2.5 ? 'text-success' : 
-                    item.turnover >= 1.5 ? 'text-warning' : 'text-error'
-                  }`}>
-                    {item.turnover}x
-                  </Text>
-                </View>
-                
-                <View className="items-center">
-                  <Text className="text-neutral-500 text-xs">Days</Text>
-                  <Text className={`font-bold ${
-                    item.days <= 14 ? 'text-success' : 
-                    item.days <= 21 ? 'text-warning' : 'text-error'
-                  }`}>
-                    {item.days}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          ))}
+            ))}
+          </View>
         </View>
 
         {/* Performance Metrics */}
-        <View className="mx-4 mt-4 mb-6">
+        <View className="mb-6">
           <Text className="text-primary text-lg font-bold mb-3">
-            Key Performance Indicators
+            Performance Metrics
           </Text>
-          
-          <View className="flex-row flex-wrap justify-between">
-            <View className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-accent-100 w-[48%]">
-              <Text className="text-neutral-500 text-sm mb-2">Sell-Through Rate</Text>
-              <Text className={`text-2xl font-bold ${getPerformanceColor(analyticsData.performanceMetrics.sellThroughRate, 'positive')}`}>
+
+          <View className="bg-white rounded-xl p-4 shadow-sm border border-accent-100">
+            <View className="flex-row justify-between items-center py-2">
+              <Text className="text-neutral-600">Sell-Through Rate</Text>
+              <Text className="text-success font-semibold">
                 {analyticsData.performanceMetrics.sellThroughRate}%
               </Text>
-              <Text className="text-success text-xs font-medium mt-1">
-                Excellent
-              </Text>
             </View>
 
-            <View className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-accent-100 w-[48%]">
-              <Text className="text-neutral-500 text-sm mb-2">Stockout Frequency</Text>
-              <Text className={`text-2xl font-bold ${getPerformanceColor(analyticsData.performanceMetrics.stockoutFrequency, 'negative')}`}>
+            <View className="flex-row justify-between items-center py-2 border-t border-accent-100">
+              <Text className="text-neutral-600">Stockout Frequency</Text>
+              <Text className="text-warning font-semibold">
                 {analyticsData.performanceMetrics.stockoutFrequency}%
               </Text>
-              <Text className="text-warning text-xs font-medium mt-1">
-                Needs improvement
-              </Text>
             </View>
 
-            <View className="bg-white rounded-xl p-4 shadow-sm border border-accent-100 w-[48%]">
-              <Text className="text-neutral-500 text-sm mb-2">GMROI</Text>
-              <Text className="text-success text-2xl font-bold">
-                {analyticsData.performanceMetrics.grossMarginReturn}x
-              </Text>
-              <Text className="text-success text-xs font-medium mt-1">
-                Good return
-              </Text>
-            </View>
-
-            <View className="bg-white rounded-xl p-4 shadow-sm border border-accent-100 w-[48%]">
-              <Text className="text-neutral-500 text-sm mb-2">Inventory Accuracy</Text>
-              <Text className="text-success text-2xl font-bold">
+            <View className="flex-row justify-between items-center py-2 border-t border-accent-100">
+              <Text className="text-neutral-600">Inventory Accuracy</Text>
+              <Text className="text-success font-semibold">
                 {analyticsData.performanceMetrics.inventoryAccuracy}%
-              </Text>
-              <Text className="text-success text-xs font-medium mt-1">
-                High accuracy
               </Text>
             </View>
           </View>
@@ -696,26 +660,28 @@ const Analytics = () => {
 
       {/* Action Buttons */}
       <View className="p-4 border-t border-accent-100 bg-white">
-        <View className="flex-row justify-between">
-          <TouchableOpacity 
-            className="flex-1 mr-2 bg-primary rounded-lg py-3 items-center"
-            onPress={() => router.push('/restock')}
-          >
-            <Text className="text-white font-semibold">View Detailed Reports</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            className={`flex-1 ml-2 bg-secondary rounded-lg py-3 items-center ${
-              isPrinting ? 'opacity-70' : ''
-            }`}
-            onPress={generatePDF}
-            disabled={isPrinting}
-          >
-            <Text className="text-white font-semibold">
-              {isPrinting ? 'Generating PDF...' : 'Print as PDF'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          className={`bg-secondary rounded-lg py-4 items-center mb-3 ${
+            isPrinting ? "opacity-70" : ""
+          }`}
+          onPress={generatePDF}
+          disabled={isPrinting}
+        >
+          <Text className="text-white text-lg font-semibold">
+            {isPrinting ? "Saving PDF..." : "Save as PDF"}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          className="bg-primary rounded-lg py-3 items-center"
+          onPress={viewSavedPDFs}
+        >
+          <Text className="text-white font-semibold">View Saved Reports</Text>
+        </TouchableOpacity>
+
+        <Text className="text-neutral-500 text-xs text-center mt-2">
+          PDFs are automatically saved to device storage
+        </Text>
       </View>
     </View>
   );

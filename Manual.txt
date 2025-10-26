@@ -17,6 +17,8 @@ npm install react-native-share  => import Share from 'react-native-share';
 npm install react-native-blob-util => import RNFetchBlob from 'react-native-blob-util';
 
 npm install -g eas-cli > install eas
+eas build --platform android --profile preview > build the apk
+
 eas build --platform android
 
 layout for receipt
@@ -24,7 +26,7 @@ date-college-or.no-id
 
 input stepper -> min max input
 
-eas build --platform android --profile preview > build the apk
+
 
 npx expo install expo-sharing > for file transfer
 npm install --save-dev @types/date-fns > for file save 
@@ -37,7 +39,11 @@ npx expo install react-native-view-shot
 npx expo install react-native-html-to-pdf
 
 npm install react-native-html-to-pdf
-npx expo install expo-print expo-sharing
+npx expo install expo-print > combine with: expo-sharing
+
+npm install expo-media-library
+
+expo install expo-intent-launcher
 
 
 

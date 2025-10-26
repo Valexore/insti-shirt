@@ -82,22 +82,23 @@ const Login = () => {
       <ScrollView keyboardShouldPersistTaps="handled">
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View className="items-center justify-start flex-1 pt-10 bg-white">
-            {/* Logo - You'll need to add your own logo */}
+            {/* Fixed Logo Size - 295x94px scaled down proportionally */}
             <Image 
-              source={require('../../assets/images/size-shirt/extra-extra-extra-large.png')} 
-              style={{ width: 150, height: 150 }} 
+              source={require('../../assets/images/welcome-logo.png')} 
+              style={{ 
+                width: 200, // Scaled down from 295px
+                height: 64, // Scaled down from 94px (maintaining aspect ratio)
+                resizeMode: 'contain'
+              }} 
             />
             
-            <View className="gap-2">
-              <Text className="max-w-xl text-3xl font-medium text-center text-primary">
-                Welcome to{"\n"}this App!
-              </Text>
+            <View className="gap-2 mt-4">
               <Text className="max-w-xs text-center text-neutral-500">
-Welcome bruh! Please login to continue.
+                Welcome bruh! Please login to continue.
               </Text>
             </View>
 
-            {/* Login Form */}
+            {/* Rest of your login form remains the same */}
             <View className="w-full px-5 mt-10">
               {/* Email Input */}
               <View className="mb-4">
@@ -162,11 +163,8 @@ Welcome bruh! Please login to continue.
                 </Text>
               </TouchableOpacity>
 
-
               {/* Quick Navigation Buttons - For development/testing */}
               <View className="mt-8 border-t border-gray-300 pt-6">
-
-                
                 <View className="flex-row justify-between space-x-3">
                   <TouchableOpacity
                     className="flex-1 bg-green-500 rounded-lg py-2"
