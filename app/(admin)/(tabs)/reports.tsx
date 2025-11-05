@@ -1,122 +1,16 @@
 import { Calendar, Download, Eye, Filter, Search, Trash2 } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   FlatList,
+  RefreshControl,
   Text,
   TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
+import { reportService } from '../../../services/database';
 import Modal from '../../components/Modal';
-
-// Sample PDF report data
-const sampleReports = [
-  {
-    id: '1',
-    fileName: 'Sales_Report_2024_01_15.pdf',
-    title: 'Sales Stock Report - January 15, 2024',
-    generatedBy: 'Juan Dela Cruz',
-    fileSize: '2.4 MB',
-    dateGenerated: '2024-01-15T14:30:00',
-    timeRange: 'Weekly',
-    totalSales: 12540,
-    totalItems: 342,
-    pages: 12,
-    type: 'sales_stock'
-  },
-  {
-    id: '2',
-    fileName: 'Sales_Report_2024_01_08.pdf',
-    title: 'Sales Stock Report - January 8, 2024',
-    generatedBy: 'Maria Santos',
-    fileSize: '1.8 MB',
-    dateGenerated: '2024-01-08T09:15:00',
-    timeRange: 'Weekly',
-    totalSales: 11870,
-    totalItems: 298,
-    pages: 10,
-    type: 'sales_stock'
-  },
-  {
-    id: '3',
-    fileName: 'Sales_Report_2024_01_01.pdf',
-    title: 'Sales Stock Monthly Report - January 2024',
-    generatedBy: 'Admin User',
-    fileSize: '3.2 MB',
-    dateGenerated: '2024-01-01T16:45:00',
-    timeRange: 'Monthly',
-    totalSales: 45200,
-    totalItems: 1250,
-    pages: 18,
-    type: 'sales_stock'
-  },
-  {
-    id: '4',
-    fileName: 'Sales_Report_2023_12_25.pdf',
-    title: 'Sales Stock Report - December 25, 2023',
-    generatedBy: 'Pedro Reyes',
-    fileSize: '2.1 MB',
-    dateGenerated: '2023-12-25T11:20:00',
-    timeRange: 'Weekly',
-    totalSales: 14200,
-    totalItems: 385,
-    pages: 11,
-    type: 'sales_stock'
-  },
-  {
-    id: '5',
-    fileName: 'Sales_Report_2023_12_18.pdf',
-    title: 'Sales Stock Report - December 18, 2023',
-    generatedBy: 'Juan Dela Cruz',
-    fileSize: '1.9 MB',
-    dateGenerated: '2023-12-18T13:10:00',
-    timeRange: 'Weekly',
-    totalSales: 15680,
-    totalItems: 412,
-    pages: 13,
-    type: 'sales_stock'
-  },
-  {
-    id: '6',
-    fileName: 'Sales_Report_2023_12_01.pdf',
-    title: 'Sales Stock Monthly Report - December 2023',
-    generatedBy: 'Admin User',
-    fileSize: '3.5 MB',
-    dateGenerated: '2023-12-01T15:30:00',
-    timeRange: 'Monthly',
-    totalSales: 48900,
-    totalItems: 1345,
-    pages: 20,
-    type: 'sales_stock'
-  },
-  {
-    id: '7',
-    fileName: 'Sales_Report_2023_11_20.pdf',
-    title: 'Sales Stock Report - November 20, 2023',
-    generatedBy: 'Maria Santos',
-    fileSize: '2.2 MB',
-    dateGenerated: '2023-11-20T10:45:00',
-    timeRange: 'Weekly',
-    totalSales: 13200,
-    totalItems: 356,
-    pages: 12,
-    type: 'sales_stock'
-  },
-  {
-    id: '8',
-    fileName: 'Sales_Report_2023_11_01.pdf',
-    title: 'Sales Stock Monthly Report - November 2023',
-    generatedBy: 'Admin User',
-    fileSize: '3.1 MB',
-    dateGenerated: '2023-11-01T14:20:00',
-    timeRange: 'Monthly',
-    totalSales: 51200,
-    totalItems: 1420,
-    pages: 17,
-    type: 'sales_stock'
-  }
-];
 
 const timeRangeOptions = [
   { label: 'All Time', value: 'all' },
@@ -129,19 +23,38 @@ const timeRangeOptions = [
 ];
 
 const Reports = () => {
-  const [reports, setReports] = useState(sampleReports);
+  const [reports, setReports] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTimeRange, setSelectedTimeRange] = useState('all');
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [selectedReport, setSelectedReport] = useState<any>(null);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load reports from database
+  const loadReports = async () => {
+    try {
+      setIsLoading(true);
+      const reportsData = await reportService.getReports();
+      setReports(reportsData);
+    } catch (error) {
+      console.error('Error loading reports:', error);
+      Alert.alert('Error', 'Failed to load reports');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadReports();
+  }, []);
 
   // Filter function to handle time range filtering
   const filterReportsByTimeRange = (reports: any[], range: string) => {
     const now = new Date();
     
     return reports.filter(report => {
-      const reportDate = new Date(report.dateGenerated);
+      const reportDate = new Date(report.date_generated);
       
       switch (range) {
         case 'today':
@@ -160,9 +73,9 @@ const Reports = () => {
           return reportDate.getMonth() === lastMonth.getMonth() && 
                  reportDate.getFullYear() === lastMonth.getFullYear();
         case 'Weekly':
-          return report.timeRange === 'Weekly';
+          return report.time_range === 'Weekly';
         case 'Monthly':
-          return report.timeRange === 'Monthly';
+          return report.time_range === 'Monthly';
         case 'all':
         default:
           return true;
@@ -174,8 +87,8 @@ const Reports = () => {
   const filteredReports = filterReportsByTimeRange(reports, selectedTimeRange).filter(report => {
     return (
       report.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      report.generatedBy.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      report.fileName.toLowerCase().includes(searchQuery.toLowerCase())
+      report.generated_by.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      report.file_name.toLowerCase().includes(searchQuery.toLowerCase())
     );
   });
 
@@ -186,10 +99,10 @@ const Reports = () => {
 
   const handleDownloadReport = (report: any) => {
     // Simulate download functionality
-    Alert.alert('Download Started', `Downloading ${report.fileName}`);
+    Alert.alert('Download Started', `Downloading ${report.file_name}`);
   };
 
-  const handleDeleteReport = (report: any) => {
+  const handleDeleteReport = async (report: any) => {
     Alert.alert(
       'Delete Report',
       `Are you sure you want to delete "${report.title}"? This action cannot be undone.`,
@@ -198,9 +111,15 @@ const Reports = () => {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            setReports(prev => prev.filter(r => r.id !== report.id));
-            Alert.alert('Success', 'Report deleted successfully');
+          onPress: async () => {
+            try {
+              await reportService.deleteReport(report.id);
+              await loadReports(); // Reload reports
+              Alert.alert('Success', 'Report deleted successfully');
+            } catch (error) {
+              console.error('Error deleting report:', error);
+              Alert.alert('Error', 'Failed to delete report');
+            }
           }
         }
       ]
@@ -235,7 +154,7 @@ const Reports = () => {
   };
 
   const ReportCard = ({ report }: { report: any }) => {
-    const { date, time } = formatDate(report.dateGenerated);
+    const { date, time } = formatDate(report.date_generated);
     
     return (
       <View className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-accent-100">
@@ -245,15 +164,15 @@ const Reports = () => {
               {report.title}
             </Text>
             <View className="flex-row items-center mb-2">
-              <View className={`px-2 py-1 rounded-full ${getTimeRangeColor(report.timeRange)}`}>
+              <View className={`px-2 py-1 rounded-full ${getTimeRangeColor(report.time_range)}`}>
                 <Text className="text-xs font-medium">
-                  {report.timeRange}
+                  {report.time_range}
                 </Text>
               </View>
             </View>
           </View>
           <Text className="text-neutral-500 text-sm">
-            {report.fileSize}
+            {report.file_size}
           </Text>
         </View>
 
@@ -261,7 +180,7 @@ const Reports = () => {
         <View className="flex-row justify-between mb-3">
           <View className="flex-1">
             <Text className="text-neutral-500 text-sm mb-1">Generated by</Text>
-            <Text className="text-primary font-semibold">{report.generatedBy}</Text>
+            <Text className="text-primary font-semibold">{report.generated_by}</Text>
           </View>
           <View className="flex-1 items-end">
             <Text className="text-neutral-500 text-sm mb-1">Date Generated</Text>
@@ -274,11 +193,11 @@ const Reports = () => {
         <View className="flex-row justify-between mb-4 bg-primary/5 rounded-lg p-3">
           <View className="items-center">
             <Text className="text-neutral-500 text-xs">Total Sales</Text>
-            <Text className="text-secondary font-bold">{formatCurrency(report.totalSales)}</Text>
+            <Text className="text-secondary font-bold">{formatCurrency(report.total_sales)}</Text>
           </View>
           <View className="items-center">
             <Text className="text-neutral-500 text-xs">Items Sold</Text>
-            <Text className="text-primary font-bold">{report.totalItems}</Text>
+            <Text className="text-primary font-bold">{report.total_items}</Text>
           </View>
           <View className="items-center">
             <Text className="text-neutral-500 text-xs">Pages</Text>
@@ -315,6 +234,14 @@ const Reports = () => {
       </View>
     );
   };
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 bg-neutral-50 justify-center items-center">
+        <Text className="text-primary text-lg">Loading reports...</Text>
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-neutral-50">
@@ -401,9 +328,12 @@ const Reports = () => {
           <FlatList
             data={filteredReports}
             renderItem={({ item }) => <ReportCard report={item} />}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => item.id.toString()}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 20 }}
+            refreshControl={
+              <RefreshControl refreshing={isLoading} onRefresh={loadReports} />
+            }
           />
         )}
       </View>
@@ -481,15 +411,15 @@ const Reports = () => {
                   <View className="space-y-2">
                     <View className="flex-row justify-between">
                       <Text className="text-neutral-500">Filename</Text>
-                      <Text className="text-primary font-medium">{selectedReport.fileName}</Text>
+                      <Text className="text-primary font-medium">{selectedReport.file_name}</Text>
                     </View>
                     <View className="flex-row justify-between">
                       <Text className="text-neutral-500">Generated by</Text>
-                      <Text className="text-primary font-medium">{selectedReport.generatedBy}</Text>
+                      <Text className="text-primary font-medium">{selectedReport.generated_by}</Text>
                     </View>
                     <View className="flex-row justify-between">
                       <Text className="text-neutral-500">File Size</Text>
-                      <Text className="text-primary font-medium">{selectedReport.fileSize}</Text>
+                      <Text className="text-primary font-medium">{selectedReport.file_size}</Text>
                     </View>
                     <View className="flex-row justify-between">
                       <Text className="text-neutral-500">Pages</Text>
@@ -505,20 +435,20 @@ const Reports = () => {
                     <View className="flex-row justify-between">
                       <Text className="text-neutral-500">Date Generated</Text>
                       <Text className="text-success font-medium">
-                        {formatDate(selectedReport.dateGenerated).date}
+                        {formatDate(selectedReport.date_generated).date}
                       </Text>
                     </View>
                     <View className="flex-row justify-between">
                       <Text className="text-neutral-500">Time Generated</Text>
                       <Text className="text-success font-medium">
-                        {formatDate(selectedReport.dateGenerated).time}
+                        {formatDate(selectedReport.date_generated).time}
                       </Text>
                     </View>
                     <View className="flex-row justify-between">
                       <Text className="text-neutral-500">Time Range</Text>
-                      <View className={`px-2 py-1 rounded-full ${getTimeRangeColor(selectedReport.timeRange)}`}>
+                      <View className={`px-2 py-1 rounded-full ${getTimeRangeColor(selectedReport.time_range)}`}>
                         <Text className="text-xs font-medium">
-                          {selectedReport.timeRange}
+                          {selectedReport.time_range}
                         </Text>
                       </View>
                     </View>
@@ -532,13 +462,13 @@ const Reports = () => {
                     <View className="flex-row justify-between">
                       <Text className="text-neutral-500">Total Sales</Text>
                       <Text className="text-secondary font-bold text-lg">
-                        {formatCurrency(selectedReport.totalSales)}
+                        {formatCurrency(selectedReport.total_sales)}
                       </Text>
                     </View>
                     <View className="flex-row justify-between">
                       <Text className="text-neutral-500">Items Sold</Text>
                       <Text className="text-primary font-bold text-lg">
-                        {selectedReport.totalItems}
+                        {selectedReport.total_items}
                       </Text>
                     </View>
                   </View>

@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
-import { Eye, EyeClosed } from 'lucide-react-native';
-import React, { useState } from 'react';
+import { Eye, EyeClosed, X } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Image,
@@ -14,51 +14,98 @@ import {
   TouchableWithoutFeedback,
   View
 } from 'react-native';
+import { initDatabase, userService } from '../../services/database';
+import Modal from '../components/Modal'; // Make sure to import your Modal component
 
 const Login = () => {
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isDbInitialized, setIsDbInitialized] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const isValidEmail = /\S+@\S+\.\S+/;
+  // Initialize database on component mount
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        await initDatabase();
+        setIsDbInitialized(true);
+        console.log('Database initialized successfully');
+      } catch (error) {
+        console.error('Failed to initialize database:', error);
+        showError('Failed to initialize app. Please restart.');
+      }
+    };
+
+    initializeApp();
+  }, []);
 
   const showPass = () => {
     setShowPassword(!showPassword);
   };
 
   const validateForm = () => {
-    const isEmailValid = isValidEmail.test(email);
+    const isUsernameValid = username.trim().length > 0;
     const isPassNotEmpty = password.trim().length > 0;
-    return isEmailValid && isPassNotEmpty;
+    return isUsernameValid && isPassNotEmpty;
   };
 
-  const handleLogin = () => {
-    // Simple validation
-    if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
+  // Show error in modal
+  const showError = (message: string) => {
+    setErrorMessage(message);
+    setShowErrorModal(true);
+  };
 
-    if (!isValidEmail.test(email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
-      return;
-    }
+const handleLogin = async () => {
+  // Simple validation
+  if (!username || !password) {
+    showError('Please fill in all fields');
+    return;
+  }
 
-    // Sample login logic
-    if (email === 'admin@example.com' && password === 'admin123') {
+  if (!isDbInitialized) {
+    showError('App is still initializing. Please wait...');
+    return;
+  }
+
+  setIsLoading(true);
+
+  try {
+    console.log('Attempting login with:', { username, password });
+    
+    const user = await userService.login(username, password);
+    
+    console.log('Login successful:', user);
+    
+    // If login is successful, user will be returned
+    if (user.role === 'admin') {
       router.replace('../(admin)');
-      return;
+    } else {
+      router.replace('../(user)');
     }
     
-    if (email === 'user@example.com' && password === 'user123') {
-      router.replace('../(user)');
-      return;
+  } catch (error: unknown) {
+    // REMOVE THIS LINE: console.error('Login error:', error);
+    
+    // Handle specific error types with modal
+    if (error instanceof Error) {
+      if (error.message.includes('no such table')) {
+        showError('Database not properly initialized. Please restart the app.');
+      } else if (error.message.includes('Invalid credentials or inactive account')) {
+        showError('Invalid username or password. Please check your credentials and make sure your account is active.');
+      } else {
+        showError(error.message);
+      }
+    } else {
+      showError('Invalid credentials or network error. Please try again.');
     }
-
-    Alert.alert('Success', 'Logged in successfully!');
-    router.replace('../(user)');
-  };
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleQuickNavigate = (role: 'user' | 'admin') => {
     Alert.alert(
@@ -72,6 +119,26 @@ const Login = () => {
       ]
     );
   };
+
+  // Admin test login handler
+  const handleAdminLogin = () => {
+    setUsername('admin');
+    setPassword('123');
+    
+    // Auto-login after a short delay to show the credentials
+    setTimeout(() => {
+      handleLogin();
+    }, 500);
+  };
+
+  if (!isDbInitialized) {
+    return (
+      <View className="flex-1 bg-white justify-center items-center">
+        <Text className="text-lg text-gray-700">Initializing app...</Text>
+        <Text className="text-sm text-gray-500 mt-2">Please wait</Text>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -94,30 +161,23 @@ const Login = () => {
             
             <View className="gap-2 mt-4">
               <Text className="max-w-xs text-center text-neutral-500">
-                Welcome bruh! Please login to continue.
+                Welcome! Please login to continue.
               </Text>
             </View>
 
-            {/* Rest of your login form remains the same */}
             <View className="w-full px-5 mt-10">
-              {/* Email Input */}
+              {/* Username Input */}
               <View className="mb-4">
-                <Text className="mb-2 text-sm font-medium text-gray-700">Name</Text>
+                <Text className="mb-2 text-sm font-medium text-gray-700">Username</Text>
                 <TextInput
-                  className={`w-full border rounded-lg px-4 py-3 bg-white ${
-                    email.length > 0 && !isValidEmail.test(email) 
-                      ? 'border-red-500' 
-                      : 'border-gray-300'
-                  }`}
-                  placeholder="Your name kuh!"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 bg-white"
+                  placeholder="Enter your username"
+                  value={username}
+                  onChangeText={setUsername}
                   autoCapitalize="none"
+                  autoComplete="username"
+                  editable={!isLoading}
                 />
-                {email.length > 0 && !isValidEmail.test(email) && (
-                  <Text className="mt-1 text-sm text-red-500">Name</Text>
-                )}
               </View>
 
               {/* Password Input */}
@@ -130,11 +190,14 @@ const Login = () => {
                     value={password}
                     onChangeText={setPassword}
                     secureTextEntry={!showPassword}
-                    autoComplete="off"
+                    autoComplete="password"
+                    autoCapitalize="none"
+                    editable={!isLoading}
                   />
                   <TouchableOpacity 
                     className="absolute right-3 top-3"
                     onPress={showPass}
+                    disabled={isLoading}
                   >
                     {showPassword ? (
                       <EyeClosed size={20} color="#6b7280" />
@@ -153,49 +216,98 @@ const Login = () => {
               {/* Login Button */}
               <TouchableOpacity
                 className={`w-full rounded-lg py-3 ${
-                  validateForm() ? 'bg-blue-500' : 'bg-gray-400'
+                  validateForm() && !isLoading ? 'bg-blue-500' : 'bg-gray-400'
                 }`}
                 onPress={handleLogin}
-                disabled={!validateForm()}
+                disabled={!validateForm() || isLoading}
               >
                 <Text className="text-white text-center text-lg font-semibold">
-                  Login
+                  {isLoading ? 'Logging in...' : 'Login'}
                 </Text>
               </TouchableOpacity>
 
+              {/* Admin Test Button */}
+              <View className="mt-6 border-t border-gray-300 pt-6">
+                <Text className="text-gray-700 font-semibold mb-3 text-center">
+                  Quick Admin Login
+                </Text>
+                <TouchableOpacity
+                  className="bg-green-500 rounded-lg py-3"
+                  onPress={handleAdminLogin}
+                  disabled={isLoading}
+                >
+                  <Text className="text-white text-center font-semibold text-lg">
+                    Login as Admin
+                  </Text>
+                </TouchableOpacity>
+                <Text className="text-gray-500 text-xs text-center mt-2">
+                  Uses: admin / 123
+                </Text>
+              </View>
+
               {/* Quick Navigation Buttons - For development/testing */}
-              <View className="mt-8 border-t border-gray-300 pt-6">
-                <View className="flex-row justify-between space-x-3">
+              <View className="mt-6 border-t border-gray-300 pt-6">
+                <Text className="text-gray-700 font-semibold mb-3 text-center">
+                  Direct Navigation (Dev):
+                </Text>
+                <View className="flex-row justify-between space-x-2">
                   <TouchableOpacity
-                    className="flex-1 bg-green-500 rounded-lg py-2"
+                    className="flex-1 bg-purple-500 rounded-lg py-2"
                     onPress={() => handleQuickNavigate('user')}
+                    disabled={isLoading}
                   >
-                    <Text className="text-white text-center font-semibold">
+                    <Text className="text-white text-center font-semibold text-sm">
                       Go to User
                     </Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity
-                    className="flex-1 bg-purple-500 rounded-lg py-2"
+                    className="flex-1 bg-orange-500 rounded-lg py-2"
                     onPress={() => handleQuickNavigate('admin')}
+                    disabled={isLoading}
                   >
-                    <Text className="text-white text-center font-semibold">
+                    <Text className="text-white text-center font-semibold text-sm">
                       Go to Admin
                     </Text>
                   </TouchableOpacity>
                 </View>
               </View>
-
-              {/* Sample Credentials */}
-              <View className="mt-6 p-4 bg-gray-100 rounded-lg">
-                <Text className="text-gray-700 font-semibold mb-2">Sample Credentials:</Text>
-                <Text className="text-gray-600">Admin: admin@example.com / admin123</Text>
-                <Text className="text-gray-600">User: user@example.com / user123</Text>
-              </View>
             </View>
           </View>
         </TouchableWithoutFeedback>
       </ScrollView>
+
+      {/* Error Modal */}
+{/* Simpler Error Modal */}
+<Modal
+  visible={showErrorModal}
+  onClose={() => setShowErrorModal(false)}
+  title="Login Error"
+  showCloseButton={true}
+>
+  <View className="p-4">
+    <View className="bg-white rounded-xl p-4 shadow-sm border border-accent-100">
+      <View className="items-center mb-4">
+        <View className="bg-error/20 p-3 rounded-full mb-3">
+          <X size={32} color="#EF4444" />
+        </View>
+        <Text className="text-error text-lg font-bold text-center mb-2">
+          Login Failed
+        </Text>
+        <Text className="text-neutral-600 text-center">
+          {errorMessage}
+        </Text>
+      </View>
+      
+      <TouchableOpacity
+        className="bg-primary rounded-lg py-3 px-4 mt-2 items-center"
+        onPress={() => setShowErrorModal(false)}
+      >
+        <Text className="text-white font-semibold text-lg">Try Again</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
     </KeyboardAvoidingView>
   );
 };

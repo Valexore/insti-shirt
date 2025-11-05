@@ -1,17 +1,20 @@
 import { useRouter } from 'expo-router';
-import { Edit2, LogOut, Settings } from 'lucide-react-native';
-import React, { useState } from 'react';
+import { Edit2, LogOut, RefreshCw, Settings } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
-import Modal from '../../components/Modal'; // Adjust path as needed
+import { adminService } from '../../../services/adminService';
+import { initDatabase, itemService } from '../../../services/database';
+import Modal from '../../components/Modal';
 
-const index = () => {
+const Index = () => {
   const router = useRouter();
   const [showAdminSettings, setShowAdminSettings] = useState(false);
   const [adminProfile, setAdminProfile] = useState({
@@ -27,71 +30,75 @@ const index = () => {
     confirmPassword: ''
   });
 
-  // Sample data for admin dashboard
-  const adminStats = {
-    totalSales: 2450,
-    totalRevenue: 125000,
-    todayRevenue: 8500,
-    activeCashiers: 8,
-    lowStockItems: 3,
-    totalRestocks: 45,
-    rejectedItems: 5
+  // State for dashboard data
+  const [adminStats, setAdminStats] = useState({
+    totalSales: 0,
+    totalRevenue: 0,
+    todayRevenue: 0,
+    activeCashiers: 0,
+    lowStockItems: 0,
+    totalRestocks: 0,
+    rejectedItems: 0
+  });
+  const [userActivities, setUserActivities] = useState<any[]>([]);
+  const [inventoryStatus, setInventoryStatus] = useState<any[]>([]);
+  const [todayPerformance, setTodayPerformance] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Load dashboard data
+  const loadDashboardData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Ensure database is initialized
+      await initDatabase();
+      
+      // Load dashboard stats
+      const stats = await adminService.getDashboardStats();
+      setAdminStats(stats);
+
+      // Load user activities
+      const activities = await adminService.getUserActivities();
+      setUserActivities(activities);
+
+      // Load inventory status
+      const items = await itemService.getItems();
+      const inventory = items.map((item: any) => ({
+        size: item.label,
+        stock: item.stock || 0,
+        threshold: item.low_stock_threshold || 5,
+        status: item.stock === 0 ? 'critical' : 
+                item.stock <= (item.low_stock_threshold || 5) ? 'warning' : 'good'
+      }));
+      setInventoryStatus(inventory);
+
+      // Calculate today's performance
+      const performance = [
+        { metric: 'Items Sold', value: stats.totalSales.toString(), change: '+0%' },
+        { metric: 'Restocks', value: stats.totalRestocks.toString(), change: '+0%' },
+        { metric: 'Rejected Items', value: stats.rejectedItems.toString(), change: '+0%' },
+        { metric: 'Active Cashiers', value: `${stats.activeCashiers}/${stats.activeCashiers}`, change: '+0' }
+      ];
+      setTodayPerformance(performance);
+
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+      Alert.alert('Error', 'Failed to load dashboard data');
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
+    }
   };
 
-  // Sample user activities
-  const userActivities = [
-    { 
-      user: 'Juan Dela Cruz', 
-      action: 'sale', 
-      items: 15, 
-      amount: 3750, 
-      time: '2 hours ago',
-      details: 'Multiple sizes'
-    },
-    { 
-      user: 'Maria Santos', 
-      action: 'restock', 
-      items: 45, 
-      amount: 0, 
-      time: '3 hours ago',
-      details: 'Large, XL, XXL'
-    },
-    { 
-      user: 'Juan Dela Cruz', 
-      action: 'sale', 
-      items: 8, 
-      amount: 2000, 
-      time: '5 hours ago',
-      details: 'Medium, Large'
-    },
-    { 
-      user: 'Pedro Reyes', 
-      action: 'restock', 
-      items: 20, 
-      amount: 0, 
-      time: 'Yesterday',
-      details: 'Small, Medium'
-    }
-  ];
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadDashboardData();
+  };
 
-  // Sample inventory status
-  const inventoryStatus = [
-    { size: 'XS', stock: 15, threshold: 5, status: 'good' },
-    { size: 'Small', stock: 20, threshold: 5, status: 'good' },
-    { size: 'Medium', stock: 25, threshold: 5, status: 'good' },
-    { size: 'Large', stock: 18, threshold: 5, status: 'good' },
-    { size: 'XL', stock: 12, threshold: 5, status: 'good' },
-    { size: 'XXL', stock: 8, threshold: 5, status: 'warning' },
-    { size: 'XXXL', stock: 3, threshold: 5, status: 'critical' }
-  ];
-
-  // Sample today's performance
-  const todayPerformance = [
-    { metric: 'Items Sold', value: '125', change: '+12%' },
-    { metric: 'Restocks', value: '28', change: '+8%' },
-    { metric: 'Rejected Items', value: '3', change: '-2%' },
-    { metric: 'Active Cashiers', value: '6/8', change: '+1' }
-  ];
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
 
   const handleLogout = () => {
     Alert.alert(
@@ -103,7 +110,6 @@ const index = () => {
           text: 'Logout',
           style: 'destructive',
           onPress: () => {
-            // Navigate directly to your auth login
             router.replace('/(auth)/login');
           }
         }
@@ -199,6 +205,15 @@ const index = () => {
     return `₱${amount.toLocaleString()}`;
   };
 
+  if (isLoading) {
+    return (
+      <View className="flex-1 bg-neutral-50 justify-center items-center">
+        <RefreshCw size={32} color="#3B82F6" className="animate-spin" />
+        <Text className="text-primary text-lg mt-4">Loading dashboard...</Text>
+      </View>
+    );
+  }
+
   return (
     <View className="flex-1 bg-neutral-50">
       {/* Header with Welcome Message */}
@@ -232,7 +247,13 @@ const index = () => {
         </View>
       </View>
 
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        className="flex-1" 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {/* Business Overview */}
         <View className="mx-4 mt-4">
           <Text className="text-primary text-xl font-bold mb-3">
@@ -272,7 +293,7 @@ const index = () => {
                 </View>
               </View>
               <Text className="text-success text-xs font-medium mt-2">
-                All systems operational
+                {adminStats.activeCashiers > 0 ? 'All systems operational' : 'No active cashiers'}
               </Text>
             </View>
 
@@ -290,7 +311,7 @@ const index = () => {
                 </View>
               </View>
               <Text className="text-warning text-xs font-medium mt-2">
-                Needs attention
+                {adminStats.lowStockItems > 0 ? 'Needs attention' : 'All items stocked'}
               </Text>
             </View>
 
@@ -454,38 +475,44 @@ const index = () => {
           </View>
           
           <View className="bg-white rounded-xl shadow-sm border border-accent-100 overflow-hidden">
-            {userActivities.map((activity, index) => (
-              <View 
-                key={index}
-                className={`flex-row items-center p-4 ${
-                  index !== userActivities.length - 1 ? 'border-b border-accent-100' : ''
-                }`}
-              >
-                <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${getActionBackground(activity.action)}`}>
-                  <Text className={getActionColor(activity.action)}>
-                    {getActionIcon(activity.action)}
-                  </Text>
+            {userActivities.length > 0 ? (
+              userActivities.map((activity, index) => (
+                <View 
+                  key={index}
+                  className={`flex-row items-center p-4 ${
+                    index !== userActivities.length - 1 ? 'border-b border-accent-100' : ''
+                  }`}
+                >
+                  <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${getActionBackground(activity.action)}`}>
+                    <Text className={getActionColor(activity.action)}>
+                      {getActionIcon(activity.action)}
+                    </Text>
+                  </View>
+                  
+                  <View className="flex-1">
+                    <Text className="text-primary font-medium">
+                      {activity.user}
+                    </Text>
+                    <Text className="text-neutral-500 text-xs">
+                      {activity.details} • {activity.time}
+                    </Text>
+                  </View>
+                  
+                  <View className="items-end">
+                    <Text className={`font-bold ${getActionColor(activity.action)}`}>
+                      {activity.action === 'restock' ? '+' : '-'}{activity.items}
+                    </Text>
+                    <Text className="text-neutral-500 text-xs">
+                      {activity.amount > 0 ? formatCurrency(activity.amount) : 'items'}
+                    </Text>
+                  </View>
                 </View>
-                
-                <View className="flex-1">
-                  <Text className="text-primary font-medium">
-                    {activity.user}
-                  </Text>
-                  <Text className="text-neutral-500 text-xs">
-                    {activity.details} • {activity.time}
-                  </Text>
-                </View>
-                
-                <View className="items-end">
-                  <Text className={`font-bold ${getActionColor(activity.action)}`}>
-                    {activity.action === 'restock' ? '+' : '-'}{activity.items}
-                  </Text>
-                  <Text className="text-neutral-500 text-xs">
-                    {activity.amount > 0 ? formatCurrency(activity.amount) : 'items'}
-                  </Text>
-                </View>
+              ))
+            ) : (
+              <View className="p-8 items-center">
+                <Text className="text-neutral-500">No recent activities</Text>
               </View>
-            ))}
+            )}
             
             <TouchableOpacity 
               className="p-4 border-t border-accent-100 items-center"
@@ -584,4 +611,4 @@ const index = () => {
   );
 };
 
-export default index;
+export default Index;

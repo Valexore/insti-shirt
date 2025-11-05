@@ -1,6 +1,6 @@
 // app/(admin)/(tabs)/configuration.tsx
-import { ChevronDown, Plus, RotateCcw, Save, Settings, Trash2 } from 'lucide-react-native';
-import React, { useState } from 'react';
+import { ChevronDown, Plus, RotateCcw, Save, Trash2 } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Image,
@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { collegeService, configService, itemService } from '../../../services/database';
 import Modal from '../../components/Modal';
 
 // ===== TYPES AND INTERFACES =====
@@ -163,98 +164,6 @@ export const defaultMonitoringSettings: MonitoringSettings = {
   emailRecipients: ''
 };
 
-// ===== SAMPLE DATA =====
-export const sampleItems: Item[] = [
-  {
-    key: "xs",
-    label: "Extra Small",
-    image: require('../../../assets/images/size-shirt/extra-small.png'),
-    price: 299,
-    stock: 15,
-    rejected: 2,
-    lowStockThreshold: 5,
-    enabled: true
-  },
-  {
-    key: "small",
-    label: "Small",
-    image: require('../../../assets/images/size-shirt/small.png'),
-    price: 299,
-    stock: 20,
-    rejected: 1,
-    lowStockThreshold: 5,
-    enabled: true
-  },
-  {
-    key: "medium",
-    label: "Medium",
-    image: require('../../../assets/images/size-shirt/medium.png'),
-    price: 299,
-    stock: 25,
-    rejected: 0,
-    lowStockThreshold: 5,
-    enabled: true
-  },
-  {
-    key: "large",
-    label: "Large",
-    image: require('../../../assets/images/size-shirt/large.png'),
-    price: 299,
-    stock: 18,
-    rejected: 3,
-    lowStockThreshold: 5,
-    enabled: true
-  },
-  {
-    key: "xl",
-    label: "Extra Large",
-    image: require('../../../assets/images/size-shirt/extra-large.png'),
-    price: 299,
-    stock: 12,
-    rejected: 1,
-    lowStockThreshold: 5,
-    enabled: true
-  },
-  {
-    key: "xxl",
-    label: "2X Large",
-    image: require('../../../assets/images/size-shirt/extra-extra-large.png'),
-    price: 299,
-    stock: 8,
-    rejected: 2,
-    lowStockThreshold: 5,
-    enabled: true
-  },
-  {
-    key: "xxxl",
-    label: "3X Large",
-    image: require('../../../assets/images/size-shirt/extra-extra-extra-large.png'),
-    price: 299,
-    stock: 3,
-    rejected: 1,
-    lowStockThreshold: 5,
-    enabled: true
-  }
-];
-
-export const sampleColleges: College[] = [
-  { id: 'coe', name: 'College of Engineering', enabled: true },
-  { id: 'cas', name: 'College of Arts and Sciences', enabled: true },
-  { id: 'cob', name: 'College of Business', enabled: true },
-  { id: 'ccje', name: 'College of Criminal Justice Education', enabled: true },
-  { id: 'cte', name: 'College of Teacher Education', enabled: true },
-];
-
-export const availableImages = [
-  { key: 'xs', label: 'Extra Small', image: require('../../../assets/images/size-shirt/extra-small.png') },
-  { key: 'small', label: 'Small', image: require('../../../assets/images/size-shirt/small.png') },
-  { key: 'medium', label: 'Medium', image: require('../../../assets/images/size-shirt/medium.png') },
-  { key: 'large', label: 'Large', image: require('../../../assets/images/size-shirt/large.png') },
-  { key: 'xl', label: 'Extra Large', image: require('../../../assets/images/size-shirt/extra-large.png') },
-  { key: 'xxl', label: '2X Large', image: require('../../../assets/images/size-shirt/extra-extra-large.png') },
-  { key: 'xxxl', label: '3X Large', image: require('../../../assets/images/size-shirt/extra-extra-extra-large.png') }
-];
-
 // ===== UTILITY FUNCTIONS =====
 export const getStockStatusColor = (stock: number, threshold: number) => {
   if (stock === 0) return 'bg-error';
@@ -285,25 +194,25 @@ export const validateConfiguration = (sessionTimeout: string, loginAttempts: str
   return true;
 };
 
-export const resetAllSettings = (
-  setFeatures: React.Dispatch<React.SetStateAction<FeatureSettings>>,
-  setReservationSettings: React.Dispatch<React.SetStateAction<ReservationSettings>>,
-  setReturnSettings: React.Dispatch<React.SetStateAction<ReturnSettings>>,
-  setMonitoringSettings: React.Dispatch<React.SetStateAction<MonitoringSettings>>,
-  setItems: React.Dispatch<React.SetStateAction<Item[]>>,
-  setColleges: React.Dispatch<React.SetStateAction<College[]>>,
-  setSessionTimeout: React.Dispatch<React.SetStateAction<string>>,
-  setLoginAttempts: React.Dispatch<React.SetStateAction<string>>
-) => {
-  setFeatures(defaultFeatures);
-  setReservationSettings(defaultReservationSettings);
-  setReturnSettings(defaultReturnSettings);
-  setMonitoringSettings(defaultMonitoringSettings);
-  setItems(sampleItems);
-  setColleges(sampleColleges);
-  setSessionTimeout('30');
-  setLoginAttempts('5');
-  Alert.alert('Success', 'All settings reset to default values');
+// Helper function to convert settings from string to proper types
+const convertSettingsFromDB = (settings: Record<string, any>, defaultSettings: any) => {
+  const result: any = {};
+  
+  Object.keys(defaultSettings).forEach(key => {
+    if (settings[key] !== undefined) {
+      const defaultValue = defaultSettings[key];
+      
+      if (typeof defaultValue === 'boolean') {
+        result[key] = settings[key] === 'true';
+      } else if (typeof defaultValue === 'number') {
+        result[key] = Number(settings[key]);
+      } else {
+        result[key] = settings[key];
+      }
+    }
+  });
+  
+  return result;
 };
 
 // ===== MAIN COMPONENT =====
@@ -315,8 +224,9 @@ const Configuration = () => {
   const [reservationSettings, setReservationSettings] = useState<ReservationSettings>(defaultReservationSettings);
   const [returnSettings, setReturnSettings] = useState<ReturnSettings>(defaultReturnSettings);
   const [monitoringSettings, setMonitoringSettings] = useState<MonitoringSettings>(defaultMonitoringSettings);
-  const [items, setItems] = useState<Item[]>(sampleItems);
-  const [colleges, setColleges] = useState<College[]>(sampleColleges);
+  const [items, setItems] = useState<Item[]>([]);
+  const [colleges, setColleges] = useState<College[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Modal states
   const [sessionTimeout, setSessionTimeout] = useState('30');
@@ -328,7 +238,7 @@ const Configuration = () => {
   const [newItem, setNewItem] = useState<Omit<Item, 'key'> & { key: string }>({
     key: '',
     label: '',
-    image: availableImages[0].image,
+    image: require('../../../assets/images/size-shirt/extra-small.png'), // default image
     price: 299,
     stock: 0,
     rejected: 0,
@@ -342,7 +252,89 @@ const Configuration = () => {
     enabled: true
   });
 
-  // Handler functions
+  // Available images for items
+  const availableImages = [
+    { key: 'xs', label: 'Extra Small', image: require('../../../assets/images/size-shirt/extra-small.png') },
+    { key: 'small', label: 'Small', image: require('../../../assets/images/size-shirt/small.png') },
+    { key: 'medium', label: 'Medium', image: require('../../../assets/images/size-shirt/medium.png') },
+    { key: 'large', label: 'Large', image: require('../../../assets/images/size-shirt/large.png') },
+    { key: 'xl', label: 'Extra Large', image: require('../../../assets/images/size-shirt/extra-large.png') },
+    { key: 'xxl', label: '2X Large', image: require('../../../assets/images/size-shirt/extra-extra-large.png') },
+    { key: 'xxxl', label: '3X Large', image: require('../../../assets/images/size-shirt/extra-extra-extra-large.png') }
+  ];
+
+  // Load data from database
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Load main configuration
+      const savedConfig = await configService.getConfiguration();
+      if (Object.keys(savedConfig).length > 0) {
+        setFeatures(prev => ({ ...prev, ...savedConfig }));
+        
+        // Set security settings if they exist
+        if (savedConfig.sessionTimeout) {
+          setSessionTimeout(savedConfig.sessionTimeout.toString());
+        }
+        if (savedConfig.loginAttemptLimit) {
+          setLoginAttempts(savedConfig.loginAttemptLimit.toString());
+        }
+      }
+      
+      // Load additional settings
+      const reservationSettingsData = await configService.getReservationSettings();
+      if (Object.keys(reservationSettingsData).length > 0) {
+        const convertedSettings = convertSettingsFromDB(reservationSettingsData, defaultReservationSettings);
+        setReservationSettings(prev => ({ ...prev, ...convertedSettings }));
+      }
+      
+      const returnSettingsData = await configService.getReturnSettings();
+      if (Object.keys(returnSettingsData).length > 0) {
+        const convertedSettings = convertSettingsFromDB(returnSettingsData, defaultReturnSettings);
+        setReturnSettings(prev => ({ ...prev, ...convertedSettings }));
+      }
+      
+      const monitoringSettingsData = await configService.getMonitoringSettings();
+      if (Object.keys(monitoringSettingsData).length > 0) {
+        const convertedSettings = convertSettingsFromDB(monitoringSettingsData, defaultMonitoringSettings);
+        setMonitoringSettings(prev => ({ ...prev, ...convertedSettings }));
+      }
+      
+      // Load items
+      const itemsData = await itemService.getItems();
+      const transformedItems = itemsData.map((item: any) => ({
+        key: item.key,
+        label: item.label,
+        image: getImageByKey(item.image_key),
+        price: item.price,
+        stock: item.stock,
+        rejected: item.rejected,
+        lowStockThreshold: item.low_stock_threshold,
+        enabled: item.enabled
+      }));
+      setItems(transformedItems);
+      
+      // Load colleges
+      const collegesData = await collegeService.getColleges();
+      setColleges(collegesData);
+      
+    } catch (error) {
+      console.error('Error loading configuration data:', error);
+      Alert.alert('Error', 'Failed to load configuration data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getImageByKey = (key: string) => {
+    const imageItem = availableImages.find(img => img.key === key);
+    return imageItem ? imageItem.image : availableImages[0].image;
+  };
+  useEffect(() => {
+    loadData();
+  }, []);
+
   const toggleFeature = (feature: keyof FeatureSettings) => {
     setFeatures(prev => ({
       ...prev,
@@ -350,19 +342,73 @@ const Configuration = () => {
     }));
   };
 
-  const toggleItemStatus = (itemKey: string) => {
-    setItems(prev => prev.map(item => 
-      item.key === itemKey ? { ...item, enabled: !item.enabled } : item
-    ));
+  const updateReservationSetting = (key: keyof ReservationSettings, value: any) => {
+    setReservationSettings(prev => ({
+      ...prev,
+      [key]: value
+    }));
   };
 
-  const toggleCollegeStatus = (collegeId: string) => {
-    setColleges(prev => prev.map(college => 
-      college.id === collegeId ? { ...college, enabled: !college.enabled } : college
-    ));
+  const updateReturnSetting = (key: keyof ReturnSettings, value: any) => {
+    setReturnSettings(prev => ({
+      ...prev,
+      [key]: value
+    }));
   };
 
-  const deleteItem = (itemKey: string) => {
+  const updateMonitoringSetting = (key: keyof MonitoringSettings, value: any) => {
+    setMonitoringSettings(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
+const toggleItemStatus = async (itemKey: string) => {
+  try {
+
+    setItems(prevItems => 
+      prevItems.map(item => 
+        item.key === itemKey ? { ...item, enabled: !item.enabled } : item
+      )
+    );
+
+    const itemsData = await itemService.getItems();
+    const dbItem = itemsData.find((dbItem: any) => dbItem.key === itemKey);
+    
+    if (dbItem) {
+      await itemService.updateItem(dbItem.id, { enabled: !items.find(item => item.key === itemKey)?.enabled });
+    }
+  } catch (error) {
+    console.error('Error updating item status:', error);
+    Alert.alert('Error', 'Failed to update item status');
+    
+    await loadData(); 
+  }
+};
+
+const toggleCollegeStatus = async (collegeId: string) => {
+  try {
+    // Optimistically update the UI first
+    setColleges(prevColleges => 
+      prevColleges.map(college => 
+        college.id === collegeId ? { ...college, enabled: !college.enabled } : college
+      )
+    );
+
+    // Then update in database
+    await collegeService.updateCollege(collegeId, { 
+      enabled: !colleges.find(c => c.id === collegeId)?.enabled 
+    });
+    
+  } catch (error) {
+    console.error('Error updating college status:', error);
+    Alert.alert('Error', 'Failed to update college status');
+    
+    await loadData();
+  }
+};
+
+  const deleteItem = async (itemKey: string) => {
     Alert.alert(
       'Delete Item',
       'Are you sure you want to delete this item? This action cannot be undone.',
@@ -371,16 +417,28 @@ const Configuration = () => {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            setItems(prev => prev.filter(item => item.key !== itemKey));
-            Alert.alert('Success', 'Item deleted successfully');
+          onPress: async () => {
+            try {
+              // Find the actual item ID from the database
+              const itemsData = await itemService.getItems();
+              const dbItem = itemsData.find((dbItem: any) => dbItem.key === itemKey);
+              
+              if (dbItem) {
+                await itemService.deleteItem(dbItem.id);
+                await loadData(); // Reload items
+                Alert.alert('Success', 'Item deleted successfully');
+              }
+            } catch (error) {
+              console.error('Error deleting item:', error);
+              Alert.alert('Error', 'Failed to delete item');
+            }
           }
         }
       ]
     );
   };
 
-  const deleteCollege = (collegeId: string) => {
+  const deleteCollege = async (collegeId: string) => {
     Alert.alert(
       'Delete College',
       'Are you sure you want to delete this college? This action cannot be undone.',
@@ -389,60 +447,100 @@ const Configuration = () => {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            setColleges(prev => prev.filter(college => college.id !== collegeId));
-            Alert.alert('Success', 'College deleted successfully');
+          onPress: async () => {
+            try {
+              await collegeService.deleteCollege(collegeId);
+              await loadData(); // Reload colleges
+              Alert.alert('Success', 'College deleted successfully');
+            } catch (error) {
+              console.error('Error deleting college:', error);
+              Alert.alert('Error', 'Failed to delete college');
+            }
           }
         }
       ]
     );
   };
 
-  const handleAddItem = () => {
+  const handleAddItem = async () => {
     if (!newItem.key || !newItem.label || !newItem.price) {
       Alert.alert('Error', 'Please fill all required fields');
       return;
     }
 
-    if (items.find(item => item.key === newItem.key)) {
-      Alert.alert('Error', 'Item key already exists');
-      return;
-    }
+    try {
+      // Check if item key already exists
+      if (items.find(item => item.key === newItem.key)) {
+        Alert.alert('Error', 'Item key already exists');
+        return;
+      }
 
-    setItems(prev => [...prev, newItem as Item]);
-    setShowAddItemModal(false);
-    setNewItem({
-      key: '',
-      label: '',
-      image: availableImages[0].image,
-      price: 299,
-      stock: 0,
-      rejected: 0,
-      lowStockThreshold: 5,
-      enabled: true
-    });
-    Alert.alert('Success', 'Item added successfully');
+      // Find the selected image key
+      const selectedImage = availableImages.find(img => img.image === newItem.image);
+      
+      await itemService.createItem({
+        key: newItem.key,
+        label: newItem.label,
+        image_key: selectedImage?.key || 'xs',
+        price: newItem.price,
+        stock: newItem.stock,
+        rejected: newItem.rejected,
+        low_stock_threshold: newItem.lowStockThreshold,
+        enabled: newItem.enabled
+      });
+
+      setShowAddItemModal(false);
+      setNewItem({
+        key: '',
+        label: '',
+        image: availableImages[0].image,
+        price: 299,
+        stock: 0,
+        rejected: 0,
+        lowStockThreshold: 5,
+        enabled: true
+      });
+      
+      await loadData(); // Reload items
+      Alert.alert('Success', 'Item added successfully');
+    } catch (error) {
+      console.error('Error adding item:', error);
+      Alert.alert('Error', 'Failed to add item');
+    }
   };
 
-  const handleAddCollege = () => {
+  const handleAddCollege = async () => {
     if (!newCollege.id || !newCollege.name) {
       Alert.alert('Error', 'Please fill all required fields');
       return;
     }
 
-    if (colleges.find(college => college.id === newCollege.id)) {
-      Alert.alert('Error', 'College ID already exists');
-      return;
-    }
+    try {
+      // Check if college ID already exists
+      if (colleges.find(college => college.id === newCollege.id)) {
+        Alert.alert('Error', 'College ID already exists');
+        return;
+      }
 
-    setColleges(prev => [...prev, newCollege as College]);
-    setShowAddCollegeModal(false);
-    setNewCollege({
-      id: '',
-      name: '',
-      enabled: true
-    });
-    Alert.alert('Success', 'College added successfully');
+      await collegeService.createCollege({
+        id: newCollege.id,
+        name: newCollege.name,
+        enabled: newCollege.enabled
+      });
+
+      setShowAddCollegeModal(false);
+      setNewCollege({
+        id: '',
+        name: '',
+        enabled: true
+      });
+      
+      await loadData(); // Reload colleges
+      Alert.alert('Success', 'College added successfully');
+    } catch (error) {
+      console.error('Error adding college:', error);
+      Alert.alert('Error', 'Failed to add college');
+    }
   };
 
   const selectImage = (imageItem: typeof availableImages[0]) => {
@@ -450,19 +548,34 @@ const Configuration = () => {
     setShowImageDropdown(false);
   };
 
-  const saveConfiguration = () => {
+  const saveConfiguration = async () => {
     if (!validateConfiguration(sessionTimeout, loginAttempts)) return;
 
-    setFeatures(prev => ({
-      ...prev,
-      sessionTimeout: parseInt(sessionTimeout),
-      loginAttemptLimit: parseInt(loginAttempts)
-    }));
+    try {
+      const updatedFeatures = {
+        ...features,
+        sessionTimeout: parseInt(sessionTimeout),
+        loginAttemptLimit: parseInt(loginAttempts)
+      };
 
-    Alert.alert('Success', 'Configuration saved successfully!');
+      setFeatures(updatedFeatures);
+      
+      // Save all settings to database
+      await Promise.all([
+        configService.saveConfiguration(updatedFeatures),
+        configService.saveReservationSettings(reservationSettings),
+        configService.saveReturnSettings(returnSettings),
+        configService.saveMonitoringSettings(monitoringSettings)
+      ]);
+      
+      Alert.alert('Success', 'Configuration saved successfully!');
+    } catch (error) {
+      console.error('Error saving configuration:', error);
+      Alert.alert('Error', 'Failed to save configuration');
+    }
   };
 
-  const handleResetToDefaults = () => {
+  const handleResetToDefaults = async () => {
     Alert.alert(
       'Reset Configuration',
       'Are you sure you want to reset all settings to default values?',
@@ -471,16 +584,34 @@ const Configuration = () => {
         {
           text: 'Reset',
           style: 'destructive',
-          onPress: () => resetAllSettings(
-            setFeatures,
-            setReservationSettings,
-            setReturnSettings,
-            setMonitoringSettings,
-            setItems,
-            setColleges,
-            setSessionTimeout,
-            setLoginAttempts
-          )
+          onPress: async () => {
+            try {
+              // Reset all states to default
+              setFeatures(defaultFeatures);
+              setReservationSettings(defaultReservationSettings);
+              setReturnSettings(defaultReturnSettings);
+              setMonitoringSettings(defaultMonitoringSettings);
+              setSessionTimeout('30');
+              setLoginAttempts('5');
+              
+              // Save all default configurations to database
+              await Promise.all([
+                configService.saveConfiguration({
+                  ...defaultFeatures,
+                  sessionTimeout: 30,
+                  loginAttemptLimit: 5
+                }),
+                configService.saveReservationSettings(defaultReservationSettings),
+                configService.saveReturnSettings(defaultReturnSettings),
+                configService.saveMonitoringSettings(defaultMonitoringSettings)
+              ]);
+              
+              Alert.alert('Success', 'Configuration reset to defaults!');
+            } catch (error) {
+              console.error('Error resetting configuration:', error);
+              Alert.alert('Error', 'Failed to reset configuration');
+            }
+          }
         }
       ]
     );
@@ -520,81 +651,40 @@ const Configuration = () => {
     </View>
   );
 
-  // Tab Components
-  const renderSettingsTab = () => (
-    <SettingsTab 
-      features={features}
-      toggleFeature={toggleFeature}
-      sessionTimeout={sessionTimeout}
-      setSessionTimeout={setSessionTimeout}
-      loginAttempts={loginAttempts}
-      setLoginAttempts={setLoginAttempts}
-      saveConfiguration={saveConfiguration}
-      handleResetToDefaults={handleResetToDefaults}
-      FeatureToggle={FeatureToggle}
-      NumberInput={NumberInput}
-    />
-  );
-
-  const renderItemsTab = () => (
-    <ItemsTab 
-      items={items}
-      showAddItemModal={showAddItemModal}
-      setShowAddItemModal={setShowAddItemModal}
-      toggleItemStatus={toggleItemStatus}
-      deleteItem={deleteItem}
-      getStockStatusColor={getStockStatusColor}
-      getStockStatusText={getStockStatusText}
-    />
-  );
-
-  const renderCollegesTab = () => (
-    <CollegesTab 
-      colleges={colleges}
-      showAddCollegeModal={showAddCollegeModal}
-      setShowAddCollegeModal={setShowAddCollegeModal}
-      toggleCollegeStatus={toggleCollegeStatus}
-      deleteCollege={deleteCollege}
-    />
-  );
-
-  const renderReservationTab = () => (
-    <ReservationTab 
-      reservationSettings={reservationSettings}
-      setReservationSettings={setReservationSettings}
-      FeatureToggle={FeatureToggle}
-      NumberInput={NumberInput}
-    />
-  );
-
-  const renderReturnsTab = () => (
-    <ReturnsTab 
-      returnSettings={returnSettings}
-      setReturnSettings={setReturnSettings}
-      FeatureToggle={FeatureToggle}
-      NumberInput={NumberInput}
-    />
-  );
-
-  const renderMonitoringTab = () => (
-    <MonitoringTab 
-      monitoringSettings={monitoringSettings}
-      setMonitoringSettings={setMonitoringSettings}
-      FeatureToggle={FeatureToggle}
-    />
-  );
+  if (isLoading) {
+    return (
+      <View className="flex-1 bg-neutral-50 justify-center items-center">
+        <Text className="text-primary text-lg">Loading configuration...</Text>
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-neutral-50">
       {/* Header */}
       <View className="bg-primary p-6 pt-12 pb-4">
-        <View className="flex-row items-center">
-          <Settings size={24} color="white" />
-          <Text className="text-white text-2xl font-bold ml-3">System Configuration</Text>
+        <View className="flex-row justify-between items-start">
+          <View className="flex-1">
+            <Text className="text-white text-2xl font-bold">Configuration</Text>
+            <Text className="text-accent-100 text-sm mt-1">
+              System settings and item management
+            </Text>
+          </View>
+          <View className="flex-row space-x-2">
+            <TouchableOpacity
+              className="bg-white/20 rounded-lg p-2"
+              onPress={handleResetToDefaults}
+            >
+              <RotateCcw size={20} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="bg-white/20 rounded-lg p-2"
+              onPress={saveConfiguration}
+            >
+              <Save size={20} color="white" />
+            </TouchableOpacity>
+          </View>
         </View>
-        <Text className="text-accent-100 text-sm mt-1">
-          Configure user interface features and system settings
-        </Text>
       </View>
 
       {/* Tab Navigation - Scrollable */}
@@ -698,12 +788,68 @@ const Configuration = () => {
       </View>
 
       {/* Tab Content */}
-      {activeTab === 'settings' && renderSettingsTab()}
-      {activeTab === 'items' && renderItemsTab()}
-      {activeTab === 'colleges' && renderCollegesTab()}
-      {activeTab === 'reservation' && renderReservationTab()}
-      {activeTab === 'returns' && renderReturnsTab()}
-      {activeTab === 'monitoring' && renderMonitoringTab()}
+      {activeTab === 'settings' && (
+        <SettingsTab 
+          features={features}
+          toggleFeature={toggleFeature}
+          sessionTimeout={sessionTimeout}
+          setSessionTimeout={setSessionTimeout}
+          loginAttempts={loginAttempts}
+          setLoginAttempts={setLoginAttempts}
+          saveConfiguration={saveConfiguration}
+          handleResetToDefaults={handleResetToDefaults}
+          FeatureToggle={FeatureToggle}
+          NumberInput={NumberInput}
+        />
+      )}
+      
+      {activeTab === 'items' && (
+        <ItemsTab 
+          items={items}
+          showAddItemModal={showAddItemModal}
+          setShowAddItemModal={setShowAddItemModal}
+          toggleItemStatus={toggleItemStatus}
+          deleteItem={deleteItem}
+          getStockStatusColor={getStockStatusColor}
+          getStockStatusText={getStockStatusText}
+        />
+      )}
+      
+      {activeTab === 'colleges' && (
+        <CollegesTab 
+          colleges={colleges}
+          showAddCollegeModal={showAddCollegeModal}
+          setShowAddCollegeModal={setShowAddCollegeModal}
+          toggleCollegeStatus={toggleCollegeStatus}
+          deleteCollege={deleteCollege}
+        />
+      )}
+      
+      {activeTab === 'reservation' && (
+        <ReservationTab 
+          reservationSettings={reservationSettings}
+          updateReservationSetting={updateReservationSetting}
+          FeatureToggle={FeatureToggle}
+          NumberInput={NumberInput}
+        />
+      )}
+      
+      {activeTab === 'returns' && (
+        <ReturnsTab 
+          returnSettings={returnSettings}
+          updateReturnSetting={updateReturnSetting}
+          FeatureToggle={FeatureToggle}
+          NumberInput={NumberInput}
+        />
+      )}
+      
+      {activeTab === 'monitoring' && (
+        <MonitoringTab 
+          monitoringSettings={monitoringSettings}
+          updateMonitoringSetting={updateMonitoringSetting}
+          FeatureToggle={FeatureToggle}
+        />
+      )}
 
       {/* Add Item Modal */}
       <AddItemModal 
@@ -1129,7 +1275,7 @@ const CollegesTab = ({ colleges, showAddCollegeModal, setShowAddCollegeModal, to
   </View>
 );
 
-const ReservationTab = ({ reservationSettings, setReservationSettings, FeatureToggle, NumberInput }: any) => (
+const ReservationTab = ({ reservationSettings, updateReservationSetting, FeatureToggle, NumberInput }: any) => (
   <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
     <Text className="text-primary text-lg font-bold mb-4">
       Reservation System Configuration
@@ -1147,10 +1293,7 @@ const ReservationTab = ({ reservationSettings, setReservationSettings, FeatureTo
         <NumberInput
           label="Maximum Reservation Days"
           value={reservationSettings.maxReservationDays.toString()}
-          onChange={(text: string) => setReservationSettings((prev: any) => ({ 
-            ...prev, 
-            maxReservationDays: parseInt(text) || 7 
-          }))}
+          onChange={(text: string) => updateReservationSetting('maxReservationDays', parseInt(text) || 7)}
           description="Maximum number of days a reservation can be held"
           min="1"
           max="30"
@@ -1160,10 +1303,7 @@ const ReservationTab = ({ reservationSettings, setReservationSettings, FeatureTo
         <NumberInput
           label="Auto-Cancel After"
           value={reservationSettings.autoCancelHours.toString()}
-          onChange={(text: string) => setReservationSettings((prev: any) => ({ 
-            ...prev, 
-            autoCancelHours: parseInt(text) || 24 
-          }))}
+          onChange={(text: string) => updateReservationSetting('autoCancelHours', parseInt(text) || 24)}
           description="Automatically cancel unpaid reservations after hours"
           min="1"
           max="168"
@@ -1173,10 +1313,7 @@ const ReservationTab = ({ reservationSettings, setReservationSettings, FeatureTo
         <NumberInput
           label="Max Items Per Reservation"
           value={reservationSettings.maxItemsPerReservation.toString()}
-          onChange={(text: string) => setReservationSettings((prev: any) => ({ 
-            ...prev, 
-            maxItemsPerReservation: parseInt(text) || 5 
-          }))}
+          onChange={(text: string) => updateReservationSetting('maxItemsPerReservation', parseInt(text) || 5)}
           description="Maximum number of items per reservation"
           min="1"
           max="20"
@@ -1197,10 +1334,7 @@ const ReservationTab = ({ reservationSettings, setReservationSettings, FeatureTo
         <FeatureToggle
           label="Require Deposit"
           value={reservationSettings.requireDeposit}
-          onToggle={() => setReservationSettings((prev: any) => ({ 
-            ...prev, 
-            requireDeposit: !prev.requireDeposit 
-          }))}
+          onToggle={() => updateReservationSetting('requireDeposit', !reservationSettings.requireDeposit)}
           description="Require deposit payment for reservations"
         />
         
@@ -1208,10 +1342,7 @@ const ReservationTab = ({ reservationSettings, setReservationSettings, FeatureTo
           <NumberInput
             label="Deposit Amount"
             value={reservationSettings.depositAmount.toString()}
-            onChange={(text: string) => setReservationSettings((prev: any) => ({ 
-              ...prev, 
-              depositAmount: parseInt(text) || 50 
-            }))}
+            onChange={(text: string) => updateReservationSetting('depositAmount', parseInt(text) || 50)}
             description="Amount required for reservation deposit"
             min="0"
             max="1000"
@@ -1233,20 +1364,14 @@ const ReservationTab = ({ reservationSettings, setReservationSettings, FeatureTo
         <FeatureToggle
           label="Allow Modification"
           value={reservationSettings.allowModification}
-          onToggle={() => setReservationSettings((prev: any) => ({ 
-            ...prev, 
-            allowModification: !prev.allowModification 
-          }))}
+          onToggle={() => updateReservationSetting('allowModification', !reservationSettings.allowModification)}
           description="Allow customers to modify their reservations"
         />
         
         <FeatureToggle
           label="Notification Reminders"
           value={reservationSettings.notificationReminders}
-          onToggle={() => setReservationSettings((prev: any) => ({ 
-            ...prev, 
-            notificationReminders: !prev.notificationReminders 
-          }))}
+          onToggle={() => updateReservationSetting('notificationReminders', !reservationSettings.notificationReminders)}
           description="Send reminder notifications before reservation expiry"
         />
       </View>
@@ -1254,7 +1379,7 @@ const ReservationTab = ({ reservationSettings, setReservationSettings, FeatureTo
   </ScrollView>
 );
 
-const ReturnsTab = ({ returnSettings, setReturnSettings, FeatureToggle, NumberInput }: any) => (
+const ReturnsTab = ({ returnSettings, updateReturnSetting, FeatureToggle, NumberInput }: any) => (
   <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
     <Text className="text-primary text-lg font-bold mb-4">
       Returns & Exchange Configuration
@@ -1272,10 +1397,7 @@ const ReturnsTab = ({ returnSettings, setReturnSettings, FeatureToggle, NumberIn
         <NumberInput
           label="Return Period"
           value={returnSettings.returnPeriodDays.toString()}
-          onChange={(text: string) => setReturnSettings((prev: any) => ({ 
-            ...prev, 
-            returnPeriodDays: parseInt(text) || 30 
-          }))}
+          onChange={(text: string) => updateReturnSetting('returnPeriodDays', parseInt(text) || 30)}
           description="Number of days allowed for returns after purchase"
           min="1"
           max="365"
@@ -1285,10 +1407,7 @@ const ReturnsTab = ({ returnSettings, setReturnSettings, FeatureToggle, NumberIn
         <NumberInput
           label="Refund Processing Time"
           value={returnSettings.refundProcessingDays.toString()}
-          onChange={(text: string) => setReturnSettings((prev: any) => ({ 
-            ...prev, 
-            refundProcessingDays: parseInt(text) || 7 
-          }))}
+          onChange={(text: string) => updateReturnSetting('refundProcessingDays', parseInt(text) || 7)}
           description="Days required to process refunds"
           min="1"
           max="30"
@@ -1298,10 +1417,7 @@ const ReturnsTab = ({ returnSettings, setReturnSettings, FeatureToggle, NumberIn
         <NumberInput
           label="Damage Deduction Percentage"
           value={returnSettings.damageDeductionPercent.toString()}
-          onChange={(text: string) => setReturnSettings((prev: any) => ({ 
-            ...prev, 
-            damageDeductionPercent: parseInt(text) || 20 
-          }))}
+          onChange={(text: string) => updateReturnSetting('damageDeductionPercent', parseInt(text) || 20)}
           description="Percentage deducted for damaged items"
           min="0"
           max="100"
@@ -1322,40 +1438,28 @@ const ReturnsTab = ({ returnSettings, setReturnSettings, FeatureToggle, NumberIn
         <FeatureToggle
           label="Require Reason for Return"
           value={returnSettings.requireReason}
-          onToggle={() => setReturnSettings((prev: any) => ({ 
-            ...prev, 
-            requireReason: !prev.requireReason 
-          }))}
+          onToggle={() => updateReturnSetting('requireReason', !returnSettings.requireReason)}
           description="Customers must provide reason for returns"
         />
         
         <FeatureToggle
           label="Allow Partial Returns"
           value={returnSettings.allowPartialReturns}
-          onToggle={() => setReturnSettings((prev: any) => ({ 
-            ...prev, 
-            allowPartialReturns: !prev.allowPartialReturns 
-          }))}
+          onToggle={() => updateReturnSetting('allowPartialReturns', !returnSettings.allowPartialReturns)}
           description="Allow returning only some items from an order"
         />
         
         <FeatureToggle
           label="Auto-Restock Returns"
           value={returnSettings.autoRestockReturns}
-          onToggle={() => setReturnSettings((prev: any) => ({ 
-            ...prev, 
-            autoRestockReturns: !prev.autoRestockReturns 
-          }))}
+          onToggle={() => updateReturnSetting('autoRestockReturns', !returnSettings.autoRestockReturns)}
           description="Automatically add returned items back to stock"
         />
         
         <FeatureToggle
           label="Quality Check Required"
           value={returnSettings.qualityCheckRequired}
-          onToggle={() => setReturnSettings((prev: any) => ({ 
-            ...prev, 
-            qualityCheckRequired: !prev.qualityCheckRequired 
-          }))}
+          onToggle={() => updateReturnSetting('qualityCheckRequired', !returnSettings.qualityCheckRequired)}
           description="Require quality inspection before accepting returns"
         />
       </View>
@@ -1363,7 +1467,7 @@ const ReturnsTab = ({ returnSettings, setReturnSettings, FeatureToggle, NumberIn
   </ScrollView>
 );
 
-const MonitoringTab = ({ monitoringSettings, setMonitoringSettings, FeatureToggle }: any) => (
+const MonitoringTab = ({ monitoringSettings, updateMonitoringSetting, FeatureToggle }: any) => (
   <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
     <Text className="text-primary text-lg font-bold mb-4">
       Monitoring & PDF Report Configuration
@@ -1381,60 +1485,42 @@ const MonitoringTab = ({ monitoringSettings, setMonitoringSettings, FeatureToggl
         <FeatureToggle
           label="Include Charts"
           value={monitoringSettings.includeCharts}
-          onToggle={() => setMonitoringSettings((prev: any) => ({ 
-            ...prev, 
-            includeCharts: !prev.includeCharts 
-          }))}
+          onToggle={() => updateMonitoringSetting('includeCharts', !monitoringSettings.includeCharts)}
           description="Include sales and performance charts in reports"
         />
         
         <FeatureToggle
           label="Include Data Tables"
           value={monitoringSettings.includeTables}
-          onToggle={() => setMonitoringSettings((prev: any) => ({ 
-            ...prev, 
-            includeTables: !prev.includeTables 
-          }))}
+          onToggle={() => updateMonitoringSetting('includeTables', !monitoringSettings.includeTables)}
           description="Include detailed data tables in reports"
         />
         
         <FeatureToggle
           label="Include Executive Summary"
           value={monitoringSettings.includeSummary}
-          onToggle={() => setMonitoringSettings((prev: any) => ({ 
-            ...prev, 
-            includeSummary: !prev.includeSummary 
-          }))}
+          onToggle={() => updateMonitoringSetting('includeSummary', !monitoringSettings.includeSummary)}
           description="Include high-level summary section"
         />
         
         <FeatureToggle
           label="Include Low Stock Alerts"
           value={monitoringSettings.includeLowStockAlerts}
-          onToggle={() => setMonitoringSettings((prev: any) => ({ 
-            ...prev, 
-            includeLowStockAlerts: !prev.includeLowStockAlerts 
-          }))}
+          onToggle={() => updateMonitoringSetting('includeLowStockAlerts', !monitoringSettings.includeLowStockAlerts)}
           description="Include low stock warnings in reports"
         />
         
         <FeatureToggle
           label="Include Performance Metrics"
           value={monitoringSettings.includePerformanceMetrics}
-          onToggle={() => setMonitoringSettings((prev: any) => ({ 
-            ...prev, 
-            includePerformanceMetrics: !prev.includePerformanceMetrics 
-          }))}
+          onToggle={() => updateMonitoringSetting('includePerformanceMetrics', !monitoringSettings.includePerformanceMetrics)}
           description="Include KPIs and performance indicators"
         />
         
         <FeatureToggle
           label="Include Cashier Activity"
           value={monitoringSettings.includeCashierActivity}
-          onToggle={() => setMonitoringSettings((prev: any) => ({ 
-            ...prev, 
-            includeCashierActivity: !prev.includeCashierActivity 
-          }))}
+          onToggle={() => updateMonitoringSetting('includeCashierActivity', !monitoringSettings.includeCashierActivity)}
           description="Include cashier performance and activity"
         />
       </View>
@@ -1452,30 +1538,21 @@ const MonitoringTab = ({ monitoringSettings, setMonitoringSettings, FeatureToggl
         <FeatureToggle
           label="Auto-Generate Daily Reports"
           value={monitoringSettings.autoGenerateDaily}
-          onToggle={() => setMonitoringSettings((prev: any) => ({ 
-            ...prev, 
-            autoGenerateDaily: !prev.autoGenerateDaily 
-          }))}
+          onToggle={() => updateMonitoringSetting('autoGenerateDaily', !monitoringSettings.autoGenerateDaily)}
           description="Automatically generate daily PDF reports"
         />
         
         <FeatureToggle
           label="Auto-Generate Weekly Reports"
           value={monitoringSettings.autoGenerateWeekly}
-          onToggle={() => setMonitoringSettings((prev: any) => ({ 
-            ...prev, 
-            autoGenerateWeekly: !prev.autoGenerateWeekly 
-          }))}
+          onToggle={() => updateMonitoringSetting('autoGenerateWeekly', !monitoringSettings.autoGenerateWeekly)}
           description="Automatically generate weekly PDF reports"
         />
         
         <FeatureToggle
           label="Auto-Generate Monthly Reports"
           value={monitoringSettings.autoGenerateMonthly}
-          onToggle={() => setMonitoringSettings((prev: any) => ({ 
-            ...prev, 
-            autoGenerateMonthly: !prev.autoGenerateMonthly 
-          }))}
+          onToggle={() => updateMonitoringSetting('autoGenerateMonthly', !monitoringSettings.autoGenerateMonthly)}
           description="Automatically generate monthly PDF reports"
         />
       </View>
@@ -1493,10 +1570,7 @@ const MonitoringTab = ({ monitoringSettings, setMonitoringSettings, FeatureToggl
         <FeatureToggle
           label="Email Reports"
           value={monitoringSettings.emailReports}
-          onToggle={() => setMonitoringSettings((prev: any) => ({ 
-            ...prev, 
-            emailReports: !prev.emailReports 
-          }))}
+          onToggle={() => updateMonitoringSetting('emailReports', !monitoringSettings.emailReports)}
           description="Automatically email generated reports"
         />
         
@@ -1507,10 +1581,7 @@ const MonitoringTab = ({ monitoringSettings, setMonitoringSettings, FeatureToggl
               className="bg-neutral-50 border border-accent-100 rounded-lg p-3 text-primary"
               placeholder="email1@example.com, email2@example.com"
               value={monitoringSettings.emailRecipients}
-              onChangeText={(text: string) => setMonitoringSettings((prev: any) => ({ 
-                ...prev, 
-                emailRecipients: text 
-              }))}
+              onChangeText={(text: string) => updateMonitoringSetting('emailRecipients', text)}
             />
             <Text className="text-neutral-500 text-xs mt-1">
               Separate multiple emails with commas
@@ -1525,10 +1596,7 @@ const MonitoringTab = ({ monitoringSettings, setMonitoringSettings, FeatureToggl
             placeholder="Set password for PDF reports"
             secureTextEntry
             value={monitoringSettings.reportPassword}
-            onChangeText={(text: string) => setMonitoringSettings((prev: any) => ({ 
-              ...prev, 
-              reportPassword: text 
-            }))}
+            onChangeText={(text: string) => updateMonitoringSetting('reportPassword', text)}
           />
           <Text className="text-neutral-500 text-xs mt-1">
             Password protect generated PDF reports

@@ -1,5 +1,5 @@
 import { Edit2, Trash2, UserPlus } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Image,
@@ -9,7 +9,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import Modal from "../../components/Modal"; // Adjust path as needed
+import { initDatabase, itemService, userService } from "../../../services/database";
+import Modal from "../../components/Modal";
 
 // Sample images - replace with your actual images
 const extraSmallImg = require("../../../assets/images/size-shirt/extra-small.png");
@@ -20,128 +21,15 @@ const xlImg = require("../../../assets/images/size-shirt/extra-large.png");
 const xxlImg = require("../../../assets/images/size-shirt/extra-extra-large.png");
 const xxxlImg = require("../../../assets/images/size-shirt/extra-extra-extra-large.png");
 
-// Stock data structure with rejected items
-const stockData = [
-  {
-    key: "xs",
-    label: "Extra Small",
-    image: extraSmallImg,
-    stock: 15,
-    rejected: 2,
-    lowStockThreshold: 5,
-  },
-  {
-    key: "small",
-    label: "Small",
-    image: smallImg,
-    stock: 20,
-    rejected: 1,
-    lowStockThreshold: 5,
-  },
-  {
-    key: "medium",
-    label: "Medium",
-    image: mediumImg,
-    stock: 25,
-    rejected: 0,
-    lowStockThreshold: 5,
-  },
-  {
-    key: "large",
-    label: "Large",
-    image: largeImg,
-    stock: 18,
-    rejected: 3,
-    lowStockThreshold: 5,
-  },
-  {
-    key: "xl",
-    label: "Extra Large",
-    image: xlImg,
-    stock: 12,
-    rejected: 1,
-    lowStockThreshold: 5,
-  },
-  {
-    key: "xxl",
-    label: "2X Large",
-    image: xxlImg,
-    stock: 8,
-    rejected: 2,
-    lowStockThreshold: 5,
-  },
-  {
-    key: "xxxl",
-    label: "3X Large",
-    image: xxxlImg,
-    stock: 3,
-    rejected: 1,
-    lowStockThreshold: 5,
-  },
-];
-
-// Sample user data
-const initialUsers = [
-  {
-    id: "1",
-    username: "juan_cruz",
-    name: "Juan Dela Cruz",
-    password: "••••••",
-    status: "active",
-    totalStock: 450,
-    todayRestock: 5,
-    totalSold: 125,
-    todaySold: 8,
-    totalRevenue: 312500,
-    todayRevenue: 20000,
-    totalRejected: 10,
-    todayRejected: 2,
-    lastActive: "2 hours ago",
-    joinDate: "2024-01-15",
-  },
-  {
-    id: "2",
-    username: "maria_santos",
-    name: "Maria Santos",
-    password: "••••••",
-    status: "active",
-    totalStock: 320,
-    todayRestock: 12,
-    totalSold: 98,
-    todaySold: 15,
-    totalRevenue: 245000,
-    todayRevenue: 37500,
-    totalRejected: 8,
-    todayRejected: 1,
-    lastActive: "30 minutes ago",
-    joinDate: "2024-02-10",
-  },
-  {
-    id: "3",
-    username: "pedro_reyes",
-    name: "Pedro Reyes",
-    password: "••••••",
-    status: "active",
-    totalStock: 520,
-    todayRestock: 8,
-    totalSold: 156,
-    todaySold: 10,
-    totalRevenue: 390000,
-    todayRevenue: 25000,
-    totalRejected: 15,
-    todayRejected: 3,
-    lastActive: "1 hour ago",
-    joinDate: "2023-11-20",
-  },
-];
-
 const Users = () => {
-  const [users, setUsers] = useState(initialUsers);
+  const [users, setUsers] = useState<any[]>([]);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<"summary" | "stocks">("summary");
+  const [stockData, setStockData] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Form states
   const [newUser, setNewUser] = useState({
@@ -156,6 +44,72 @@ const Users = () => {
     name: "",
     password: "",
   });
+
+  // Load users and stock data
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      // Ensure database is initialized
+      await initDatabase();
+      
+      const usersData = await userService.getUsers();
+      const itemsData = await itemService.getItems();
+      
+      // Filter out admin users (role = 'admin')
+      const cashierUsers = usersData.filter((user: any) => user.role !== 'admin');
+      
+      // Ensure all user data has proper default values
+      const usersWithDefaults = cashierUsers.map((user: any) => ({
+        ...user,
+        total_stock: user.total_stock || 0,
+        today_restock: user.today_restock || 0,
+        total_sold: user.total_sold || 0,
+        today_sold: user.today_sold || 0,
+        total_revenue: user.total_revenue || 0,
+        today_revenue: user.today_revenue || 0,
+        total_rejected: user.total_rejected || 0,
+        today_rejected: user.today_rejected || 0,
+        last_active: user.last_active || 'Never'
+      }));
+      
+      setUsers(usersWithDefaults);
+      
+      // Transform items data for display
+      const stockDataTransformed = itemsData.map((item: any) => ({
+        key: item.key,
+        label: item.label,
+        image: getImageByKey(item.image_key),
+        stock: item.stock || 0,
+        rejected: item.rejected || 0,
+        lowStockThreshold: item.low_stock_threshold || 5,
+      }));
+      
+      setStockData(stockDataTransformed);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      Alert.alert('Error', 'Failed to load data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Helper function to get image by key
+  const getImageByKey = (key: string) => {
+    const imageMap: { [key: string]: any } = {
+      'xs': extraSmallImg,
+      'small': smallImg,
+      'medium': mediumImg,
+      'large': largeImg,
+      'xl': xlImg,
+      'xxl': xxlImg,
+      'xxxl': xxxlImg
+    };
+    return imageMap[key] || extraSmallImg;
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const handleUserPress = (user: any) => {
     setSelectedUser(user);
@@ -175,7 +129,7 @@ const Users = () => {
 
   const handleEditUser = (user: any) => {
     setEditUser({
-      id: user.id,
+      id: user.id.toString(),
       username: user.username,
       name: user.name,
       password: "", // Empty for security
@@ -184,66 +138,64 @@ const Users = () => {
     setModalVisible(false);
   };
 
-  const handleSaveNewUser = () => {
-    if (!newUser.username || !newUser.name || !newUser.password) {
-      Alert.alert("Error", "Please fill all fields");
-      return;
-    }
+const handleSaveNewUser = async () => {
+  if (!newUser.username || !newUser.name || !newUser.password) {
+    Alert.alert("Error", "Please fill all fields");
+    return;
+  }
 
-    // Check if username already exists
-    if (users.find((user) => user.username === newUser.username)) {
-      Alert.alert("Error", "Username already exists");
-      return;
-    }
-
-    const userToAdd = {
-      id: Date.now().toString(),
-      username: newUser.username,
-      name: newUser.name,
-      password: "••••••",
-      status: "active",
-      totalStock: 0,
-      todayRestock: 0,
-      totalSold: 0,
-      todaySold: 0,
-      totalRevenue: 0,
-      todayRevenue: 0,
-      totalRejected: 0,
-      todayRejected: 0,
-      lastActive: "Never",
-      joinDate: new Date().toISOString().split("T")[0],
-    };
-
-    setUsers([...users, userToAdd]);
+  try {
+    // Create user with cashier role and active status by default
+    const createdUser = await userService.createUser({
+      ...newUser,
+      role: 'cashier',
+      status: 'active'
+    });
+    
+    console.log('User created successfully:', createdUser);
+    
+    // Verify the user was actually created with correct status
+    const allUsers = await userService.getUsers();
+    const verifiedUser = allUsers.find((u: any) => u.id === createdUser.id);
+    console.log('Verified user from database:', verifiedUser);
+    
     setAddModalVisible(false);
     setNewUser({ username: "", name: "", password: "" });
+    await loadData(); // Reload users
     Alert.alert("Success", "Cashier added successfully");
-  };
+  } catch (error: any) {
+    console.error('Error creating user:', error);
+    Alert.alert("Error", error.message || "Failed to add cashier");
+  }
+};
 
-  const handleSaveEditUser = () => {
+  const handleSaveEditUser = async () => {
     if (!editUser.username || !editUser.name) {
       Alert.alert("Error", "Please fill all required fields");
       return;
     }
 
-    const updatedUsers = users.map((user) =>
-      user.id === editUser.id
-        ? {
-            ...user,
-            username: editUser.username,
-            name: editUser.name,
-            ...(editUser.password && { password: "••••••" }),
-          }
-        : user
-    );
+    try {
+      const updateData: any = {
+        username: editUser.username,
+        name: editUser.name,
+      };
 
-    setUsers(updatedUsers);
-    setEditModalVisible(false);
-    setEditUser({ id: "", username: "", name: "", password: "" });
-    Alert.alert("Success", "Cashier updated successfully");
+      if (editUser.password) {
+        updateData.password = editUser.password;
+      }
+
+      await userService.updateUser(parseInt(editUser.id), updateData);
+      setEditModalVisible(false);
+      setEditUser({ id: "", username: "", name: "", password: "" });
+      await loadData(); // Reload users
+      Alert.alert("Success", "Cashier updated successfully");
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "Failed to update cashier");
+    }
   };
 
-  const handleDeleteUser = (user: any) => {
+  const handleDeleteUser = async (user: any) => {
     Alert.alert(
       "Delete Cashier",
       `Are you sure you want to delete ${user.name}? This action cannot be undone.`,
@@ -252,30 +204,43 @@ const Users = () => {
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => {
-            const filteredUsers = users.filter((u) => u.id !== user.id);
-            setUsers(filteredUsers);
-            setModalVisible(false);
-            Alert.alert("Success", "Cashier deleted successfully");
+          onPress: async () => {
+            try {
+              // Convert id to number to ensure proper type
+              const userId = parseInt(user.id);
+              
+              if (isNaN(userId)) {
+                Alert.alert("Error", "Invalid user ID");
+                return;
+              }
+
+              await userService.deleteUser(userId);
+              await loadData(); // Reload users
+              setModalVisible(false);
+              Alert.alert("Success", "Cashier deleted successfully");
+            } catch (error: any) {
+              console.error("Delete error:", error);
+              Alert.alert("Error", error.message || "Failed to delete cashier");
+            }
           },
         },
       ]
     );
   };
 
-  const handleToggleStatus = (user: any) => {
-    const updatedUsers = users.map((u) =>
-      u.id === user.id
-        ? { ...u, status: u.status === "active" ? "inactive" : "active" }
-        : u
-    );
-
-    setUsers(updatedUsers);
-    setModalVisible(false);
-    Alert.alert(
-      "Success",
-      `Cashier ${user.status === "active" ? "deactivated" : "activated"} successfully`
-    );
+  const handleToggleStatus = async (user: any) => {
+    try {
+      const newStatus = user.status === "active" ? "inactive" : "active";
+      await userService.updateUser(user.id, { status: newStatus });
+      await loadData(); // Reload users
+      setModalVisible(false);
+      Alert.alert(
+        "Success",
+        `Cashier ${newStatus === "active" ? "activated" : "deactivated"} successfully`
+      );
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "Failed to update cashier status");
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -298,9 +263,19 @@ const Users = () => {
     return "In Stock";
   };
 
-  const formatCurrency = (amount: number) => {
-    return `₱${amount.toLocaleString()}`;
+  const formatCurrency = (amount: number | undefined | null) => {
+    // Handle undefined, null, or NaN values
+    const safeAmount = amount || 0;
+    return `₱${safeAmount.toLocaleString()}`;
   };
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 bg-neutral-50 justify-center items-center">
+        <Text className="text-primary text-lg">Loading users...</Text>
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-neutral-50">
@@ -335,119 +310,128 @@ const Users = () => {
           </Text>
         </View>
 
-        {users.map((user) => (
-          <TouchableOpacity
-            key={user.id}
-            className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-accent-100"
-            onPress={() => handleUserPress(user)}
-          >
-            <View className="flex-row items-center justify-between">
-              <View className="flex-1">
-                <View className="flex-row items-center justify-between mb-2">
-                  <Text className="text-primary font-bold text-lg">
-                    {user.name}
-                  </Text>
-                  <View
-                    className={`px-2 py-1 rounded-full ${getStatusColor(user.status)}`}
-                  >
-                    <Text className="text-white text-xs font-medium">
-                      {getStatusText(user.status)}
-                    </Text>
-                  </View>
-                </View>
-
-                <Text className="text-neutral-500 text-sm mb-3">
-                  @{user.username}
-                </Text>
-
-                {/* Stats Grid */}
-                <View className="flex-row flex-wrap justify-between">
-                  {/* Total Stock */}
-                  <View className="w-[48%] mb-3">
+        {users.length === 0 ? (
+          <View className="bg-white rounded-xl p-8 items-center justify-center">
+            <Text className="text-neutral-500 text-lg mb-2">No cashiers found</Text>
+            <Text className="text-neutral-400 text-center">
+              Add your first cashier to get started with managing your team.
+            </Text>
+          </View>
+        ) : (
+          users.map((user) => (
+            <TouchableOpacity
+              key={user.id}
+              className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-accent-100"
+              onPress={() => handleUserPress(user)}
+            >
+              <View className="flex-row items-center justify-between">
+                <View className="flex-1">
+                  <View className="flex-row items-center justify-between mb-2">
                     <Text className="text-primary font-bold text-lg">
-                      {user.totalStock}
+                      {user.name}
                     </Text>
-                    <Text className="text-neutral-500 text-xs">
-                      Total Stock
-                    </Text>
+                    <View
+                      className={`px-2 py-1 rounded-full ${getStatusColor(user.status)}`}
+                    >
+                      <Text className="text-white text-xs font-medium">
+                        {getStatusText(user.status)}
+                      </Text>
+                    </View>
                   </View>
 
-                  {/* Today Restock */}
-                  <View className="w-[48%] mb-3">
-                    <Text className="text-success font-bold text-lg">
-                      {user.todayRestock}
-                    </Text>
-                    <Text className="text-neutral-500 text-xs">
-                      Today Restock
-                    </Text>
-                  </View>
-
-                  {/* Total Sold */}
-                  <View className="w-[48%] mb-3">
-                    <Text className="text-secondary font-bold text-lg">
-                      {user.totalSold}
-                    </Text>
-                    <Text className="text-neutral-500 text-xs">Total Sold</Text>
-                  </View>
-
-                  {/* Today Sold */}
-                  <View className="w-[48%] mb-3">
-                    <Text className="text-warning font-bold text-lg">
-                      {user.todaySold}
-                    </Text>
-                    <Text className="text-neutral-500 text-xs">Today Sold</Text>
-                  </View>
-
-                  {/* Total Rejected */}
-                  <View className="w-[48%] mb-3">
-                    <Text className="text-error font-bold text-lg">
-                      {user.totalRejected}
-                    </Text>
-                    <Text className="text-neutral-500 text-xs">
-                      Total Rejected
-                    </Text>
-                  </View>
-
-                  {/* Today Rejected */}
-                  <View className="w-[48%] mb-3">
-                    <Text className="text-orange-500 font-bold text-lg">
-                      {user.todayRejected}
-                    </Text>
-                    <Text className="text-neutral-500 text-xs">
-                      Today Rejected
-                    </Text>
-                  </View>
-
-                  {/* Total Revenue */}
-                  <View className="w-[48%]">
-                    <Text className="text-purple-600 font-bold text-lg">
-                      {formatCurrency(user.totalRevenue)}
-                    </Text>
-                    <Text className="text-neutral-500 text-xs">
-                      Total Revenue
-                    </Text>
-                  </View>
-
-                  {/* Today Revenue */}
-                  <View className="w-[48%]">
-                    <Text className="text-green-600 font-bold text-lg">
-                      {formatCurrency(user.todayRevenue)}
-                    </Text>
-                    <Text className="text-neutral-500 text-xs">
-                      Today Revenue
-                    </Text>
-                  </View>
-                </View>
-
-                <View className="flex-row justify-between items-center mt-3">
-                  <Text className="text-neutral-500 text-xs">
-                    Last active: {user.lastActive}
+                  <Text className="text-neutral-500 text-sm mb-3">
+                    @{user.username}
                   </Text>
+
+                  {/* Stats Grid - using actual user data with safe defaults */}
+                  <View className="flex-row flex-wrap justify-between">
+                    {/* Total Stock */}
+                    <View className="w-[48%] mb-3">
+                      <Text className="text-primary font-bold text-lg">
+                        {user.total_stock || 0}
+                      </Text>
+                      <Text className="text-neutral-500 text-xs">
+                        Total Stock
+                      </Text>
+                    </View>
+
+                    {/* Today Restock */}
+                    <View className="w-[48%] mb-3">
+                      <Text className="text-success font-bold text-lg">
+                        {user.today_restock || 0}
+                      </Text>
+                      <Text className="text-neutral-500 text-xs">
+                        Today Restock
+                      </Text>
+                    </View>
+
+                    {/* Total Sold */}
+                    <View className="w-[48%] mb-3">
+                      <Text className="text-secondary font-bold text-lg">
+                        {user.total_sold || 0}
+                      </Text>
+                      <Text className="text-neutral-500 text-xs">Total Sold</Text>
+                    </View>
+
+                    {/* Today Sold */}
+                    <View className="w-[48%] mb-3">
+                      <Text className="text-warning font-bold text-lg">
+                        {user.today_sold || 0}
+                      </Text>
+                      <Text className="text-neutral-500 text-xs">Today Sold</Text>
+                    </View>
+
+                    {/* Total Rejected */}
+                    <View className="w-[48%] mb-3">
+                      <Text className="text-error font-bold text-lg">
+                        {user.total_rejected || 0}
+                      </Text>
+                      <Text className="text-neutral-500 text-xs">
+                        Total Rejected
+                      </Text>
+                    </View>
+
+                    {/* Today Rejected */}
+                    <View className="w-[48%] mb-3">
+                      <Text className="text-orange-500 font-bold text-lg">
+                        {user.today_rejected || 0}
+                      </Text>
+                      <Text className="text-neutral-500 text-xs">
+                        Today Rejected
+                      </Text>
+                    </View>
+
+                    {/* Total Revenue */}
+                    <View className="w-[48%]">
+                      <Text className="text-purple-600 font-bold text-lg">
+                        {formatCurrency(user.total_revenue)}
+                      </Text>
+                      <Text className="text-neutral-500 text-xs">
+                        Total Revenue
+                      </Text>
+                    </View>
+
+                    {/* Today Revenue */}
+                    <View className="w-[48%]">
+                      <Text className="text-green-600 font-bold text-lg">
+                        {formatCurrency(user.today_revenue)}
+                      </Text>
+                      <Text className="text-neutral-500 text-xs">
+                        Today Revenue
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View className="flex-row justify-between items-center mt-3">
+                    <Text className="text-neutral-500 text-xs">
+                      Last active: {user.last_active || 'Never'}
+                    </Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          </TouchableOpacity>
-        ))}
+            </TouchableOpacity>
+          ))
+        )}
       </ScrollView>
 
       {/* User Detail Modal */}
@@ -525,14 +509,21 @@ const Users = () => {
                       <View className="flex-row justify-between">
                         <Text className="text-neutral-500">Join Date</Text>
                         <Text className="text-primary font-medium">
-                          {selectedUser.joinDate}
+                          {selectedUser.join_date || 'N/A'}
                         </Text>
                       </View>
 
                       <View className="flex-row justify-between">
                         <Text className="text-neutral-500">Last Active</Text>
                         <Text className="text-primary font-medium">
-                          {selectedUser.lastActive}
+                          {selectedUser.last_active || 'Never'}
+                        </Text>
+                      </View>
+
+                      <View className="flex-row justify-between">
+                        <Text className="text-neutral-500">Role</Text>
+                        <Text className="text-primary font-medium capitalize">
+                          {selectedUser.role || 'cashier'}
                         </Text>
                       </View>
                     </View>
@@ -548,7 +539,7 @@ const Users = () => {
                       {/* Total Stock */}
                       <View className="bg-primary/5 rounded-lg p-3 mb-2 w-[48%] items-center">
                         <Text className="text-primary font-bold text-xl">
-                          {selectedUser.totalStock}
+                          {selectedUser.total_stock || 0}
                         </Text>
                         <Text className="text-neutral-500 text-xs text-center">
                           Total Stock
@@ -558,7 +549,7 @@ const Users = () => {
                       {/* Today Restock */}
                       <View className="bg-success/5 rounded-lg p-3 mb-2 w-[48%] items-center">
                         <Text className="text-success font-bold text-xl">
-                          {selectedUser.todayRestock}
+                          {selectedUser.today_restock || 0}
                         </Text>
                         <Text className="text-neutral-500 text-xs text-center">
                           Today Restock
@@ -568,7 +559,7 @@ const Users = () => {
                       {/* Total Sold */}
                       <View className="bg-secondary/5 rounded-lg p-3 mb-2 w-[48%] items-center">
                         <Text className="text-secondary font-bold text-xl">
-                          {selectedUser.totalSold}
+                          {selectedUser.total_sold || 0}
                         </Text>
                         <Text className="text-neutral-500 text-xs text-center">
                           Total Sold
@@ -578,7 +569,7 @@ const Users = () => {
                       {/* Today Sold */}
                       <View className="bg-warning/5 rounded-lg p-3 mb-2 w-[48%] items-center">
                         <Text className="text-warning font-bold text-xl">
-                          {selectedUser.todaySold}
+                          {selectedUser.today_sold || 0}
                         </Text>
                         <Text className="text-neutral-500 text-xs text-center">
                           Today Sold
@@ -588,7 +579,7 @@ const Users = () => {
                       {/* Total Rejected */}
                       <View className="bg-error/5 rounded-lg p-3 mb-2 w-[48%] items-center">
                         <Text className="text-error font-bold text-xl">
-                          {selectedUser.totalRejected}
+                          {selectedUser.total_rejected || 0}
                         </Text>
                         <Text className="text-neutral-500 text-xs text-center">
                           Total Rejected
@@ -598,7 +589,7 @@ const Users = () => {
                       {/* Today Rejected */}
                       <View className="bg-orange-100 rounded-lg p-3 mb-2 w-[48%] items-center">
                         <Text className="text-orange-500 font-bold text-xl">
-                          {selectedUser.todayRejected}
+                          {selectedUser.today_rejected || 0}
                         </Text>
                         <Text className="text-neutral-500 text-xs text-center">
                           Today Rejected
@@ -608,7 +599,7 @@ const Users = () => {
                       {/* Total Revenue */}
                       <View className="bg-purple-100 rounded-lg p-3 w-[48%] items-center">
                         <Text className="text-purple-600 font-bold text-xl">
-                          {formatCurrency(selectedUser.totalRevenue)}
+                          {formatCurrency(selectedUser.total_revenue)}
                         </Text>
                         <Text className="text-neutral-500 text-xs text-center">
                           Total Revenue
@@ -618,7 +609,7 @@ const Users = () => {
                       {/* Today Revenue */}
                       <View className="bg-green-100 rounded-lg p-3 w-[48%] items-center">
                         <Text className="text-green-600 font-bold text-xl">
-                          {formatCurrency(selectedUser.todayRevenue)}
+                          {formatCurrency(selectedUser.today_revenue)}
                         </Text>
                         <Text className="text-neutral-500 text-xs text-center">
                           Today Revenue
