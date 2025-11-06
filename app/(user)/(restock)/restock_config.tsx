@@ -1,6 +1,6 @@
-// app/(tabs)/restock/restock_config.tsx
-import { useRouter } from "expo-router";
-import React, { useState } from "react";
+// app/(restock)/restock_config.tsx
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Image,
@@ -11,8 +11,9 @@ import {
   View,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
+import { restockService } from "../../../services/restockService";
 
-// Import shirt size images (same as in restock.tsx)
+// Image imports
 const extraSmallImg = require("../../../assets/images/size-shirt/extra-small.png");
 const smallImg = require("../../../assets/images/size-shirt/small.png");
 const mediumImg = require("../../../assets/images/size-shirt/medium.png");
@@ -31,30 +32,71 @@ interface StockItem {
   restockAmount: number;
 }
 
+interface UserData {
+  id: number;
+  username: string;
+  name: string;
+  role: string;
+}
+
 const RestockConfig = () => {
   const router = useRouter();
-  
-  // Sample initial data with images
-  const initialStockData: StockItem[] = [
-    { key: "xs", label: "Extra Small", image: extraSmallImg, currentStock: 15, restockAmount: 0 },
-    { key: "small", label: "Small", image: smallImg, currentStock: 20, restockAmount: 0 },
-    { key: "medium", label: "Medium", image: mediumImg, currentStock: 25, restockAmount: 0 },
-    { key: "large", label: "Large", image: largeImg, currentStock: 18, restockAmount: 0 },
-    { key: "xl", label: "Extra Large", image: xlImg, currentStock: 12, restockAmount: 0 },
-    { key: "xxl", label: "2X Large", image: xxlImg, currentStock: 8, restockAmount: 0 },
-    { key: "xxxl", label: "3X Large", image: xxxlImg, currentStock: 3, restockAmount: 0 },
-  ];
-
-  const [stockData, setStockData] = useState<StockItem[]>(initialStockData);
+  const params = useLocalSearchParams();
+  const [currentUser, setCurrentUser] = useState<UserData | null>(null);
+  const [stockData, setStockData] = useState<StockItem[]>([]);
   const [customAmount, setCustomAmount] = useState("");
   const [editingItem, setEditingItem] = useState<SizeKey | null>(null);
   const [tempAmount, setTempAmount] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleBack = () => {
+  // Parse user data
+  const parseUserData = useCallback(() => {
+    if (params.user) {
+      try {
+        const userData = JSON.parse(params.user as string);
+        setCurrentUser(userData);
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+      }
+    }
+  }, [params.user]);
+
+  useEffect(() => {
+    parseUserData();
+  }, [parseUserData]);
+
+  // Load initial stock data
+  const loadInitialData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const data = await restockService.getCurrentStock();
+      
+      const initialData: StockItem[] = data.map((item: { key: string; label: any; image: any; stock: any; }) => ({
+        key: item.key as SizeKey,
+        label: item.label,
+        image: item.image,
+        currentStock: item.stock,
+        restockAmount: 0
+      }));
+      
+      setStockData(initialData);
+    } catch (error) {
+      console.error('Error loading stock data:', error);
+      Alert.alert('Error', 'Failed to load stock data');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]);
+
+  const handleBack = useCallback(() => {
     router.back();
-  };
+  }, [router]);
 
-  const updateRestockAmount = (key: SizeKey, amount: number) => {
+  const updateRestockAmount = useCallback((key: SizeKey, amount: number) => {
     setStockData(prevData =>
       prevData.map(item =>
         item.key === key
@@ -62,15 +104,14 @@ const RestockConfig = () => {
           : item
       )
     );
-  };
+  }, []);
 
-  const handleDirectInput = (key: SizeKey, text: string) => {
-    // Allow only numbers
+  const handleDirectInput = useCallback((key: SizeKey, text: string) => {
     const numericValue = text.replace(/[^0-9]/g, '');
     setTempAmount(numericValue);
-  };
+  }, []);
 
-  const saveDirectInput = (key: SizeKey) => {
+  const saveDirectInput = useCallback((key: SizeKey) => {
     if (tempAmount === "") {
       setEditingItem(null);
       return;
@@ -82,14 +123,14 @@ const RestockConfig = () => {
     }
     setEditingItem(null);
     setTempAmount("");
-  };
+  }, [tempAmount, updateRestockAmount]);
 
-  const startEditing = (key: SizeKey, currentAmount: number) => {
+  const startEditing = useCallback((key: SizeKey, currentAmount: number) => {
     setEditingItem(key);
     setTempAmount(currentAmount.toString());
-  };
+  }, []);
 
-  const applyCustomAmount = () => {
+  const applyCustomAmount = useCallback(() => {
     if (!customAmount) return;
 
     const amount = parseInt(customAmount);
@@ -102,9 +143,14 @@ const RestockConfig = () => {
       prevData.map(item => ({ ...item, restockAmount: amount }))
     );
     setCustomAmount("");
-  };
+  }, [customAmount]);
 
-  const handleRestock = () => {
+  const handleRestock = useCallback(async () => {
+    if (!currentUser) {
+      Alert.alert("Error", "User not found");
+      return;
+    }
+
     const totalRestock = stockData.reduce(
       (sum, item) => sum + item.restockAmount,
       0
@@ -115,19 +161,99 @@ const RestockConfig = () => {
       return;
     }
 
-    // Here you would typically send the restock data to your backend
-    Alert.alert(
-      "Restock Confirmed",
-      `Successfully restocked ${totalRestock} items across all sizes!`
-    );
+    try {
+      // Prepare restock data
+      const restockData = stockData
+        .filter(item => item.restockAmount > 0)
+        .map(item => ({
+          key: item.key,
+          amount: item.restockAmount
+        }));
 
-    // Reset after restock
-    setStockData(initialStockData);
-  };
+      // Process restock in database
+      const result = await restockService.processRestock(restockData, currentUser.id);
 
-  const getTotalRestock = () => {
+      if (result.success) {
+        Alert.alert(
+          "Restock Confirmed",
+          `Successfully restocked ${result.totalRestocked} items across all sizes!`
+        );
+
+        // Navigate back to restock screen with updated data
+        router.replace({
+          pathname: '/(user)/(tabs)/restock',
+          params: { user: JSON.stringify(currentUser) }
+        });
+      }
+    } catch (error) {
+      console.error('Error processing restock:', error);
+      Alert.alert("Error", "Failed to process restock. Please try again.");
+    }
+  }, [currentUser, stockData, router]);
+
+  const getTotalRestock = useCallback(() => {
     return stockData.reduce((sum, item) => sum + item.restockAmount, 0);
-  };
+  }, [stockData]);
+
+  // Empty state component
+  const EmptyStockState = () => (
+    <View className="flex-1 justify-center items-center px-8">
+      <View className="bg-primary/10 rounded-full p-6 mb-4">
+        <Icon name="inventory" size={48} color="#3B82F6" />
+      </View>
+      <Text className="text-primary text-xl font-bold text-center mb-2">
+        No Items Available
+      </Text>
+      <Text className="text-neutral-500 text-center mb-6">
+        There are no items available for restocking. 
+        Please contact the administrator to add items to the system.
+      </Text>
+      <TouchableOpacity 
+        className="bg-primary rounded-lg py-3 px-6"
+        onPress={handleBack}
+      >
+        <Text className="text-white font-semibold text-lg">Go Back</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 bg-neutral-50 justify-center items-center">
+        <Text className="text-lg text-gray-700">Loading restock data...</Text>
+      </View>
+    );
+  }
+
+  // Add empty state check
+  if (stockData.length === 0) {
+    return (
+      <View className="flex-1 bg-neutral-50">
+        {/* Header with Back Button */}
+        <View className="bg-primary p-4">
+          <View className="flex-row items-center">
+            <TouchableOpacity 
+              onPress={handleBack}
+              className="mr-3 p-1"
+            >
+              <Icon name="arrow-back" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Text className="text-white text-xl font-bold flex-1 text-center">
+              Restock Uniforms
+            </Text>
+            <View className="w-8" />
+          </View>
+          {currentUser && (
+            <Text className="text-accent-100 text-sm text-center mt-1">
+              Restocking as: {currentUser.name}
+            </Text>
+          )}
+        </View>
+
+        <EmptyStockState />
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-neutral-50">
@@ -135,7 +261,7 @@ const RestockConfig = () => {
       <View className="bg-primary p-4">
         <View className="flex-row items-center">
           <TouchableOpacity 
-            onPress={() => router.replace('../(tabs)/restock')}
+            onPress={handleBack}
             className="mr-3 p-1"
           >
             <Icon name="arrow-back" size={24} color="#FFFFFF" />
@@ -145,6 +271,11 @@ const RestockConfig = () => {
           </Text>
           <View className="w-8" />
         </View>
+        {currentUser && (
+          <Text className="text-accent-100 text-sm text-center mt-1">
+            Restocking as: {currentUser.name}
+          </Text>
+        )}
       </View>
 
       <ScrollView 
@@ -212,7 +343,7 @@ const RestockConfig = () => {
           </Text>
         </View>
 
-        {/* Size Containers Grid - Updated Design */}
+        {/* Size Containers Grid */}
         <View className="mx-4 mb-4">
           {stockData.map((item) => (
             <View
@@ -220,7 +351,7 @@ const RestockConfig = () => {
               className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-accent-100"
             >
               <View className="flex-row items-center justify-between">
-                {/* Size Image and Basic Info - Same as restock.tsx */}
+                {/* Size Image and Basic Info */}
                 <View className="flex-row items-center flex-1">
                   <View className="w-16 h-16 bg-neutral-50 rounded-lg border border-accent-100 overflow-hidden items-center justify-center">
                     <Image

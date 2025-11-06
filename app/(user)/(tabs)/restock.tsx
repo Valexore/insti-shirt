@@ -1,17 +1,19 @@
-// app/(tabs)/restock.tsx
-import { router } from "expo-router";
-import { Info } from "lucide-react-native";
-import React, { useState } from "react";
+// app/(user)/(tabs)/restock.tsx
+import { router, useLocalSearchParams } from "expo-router";
+import { Info, Package } from "lucide-react-native";
+import React, { useEffect, useState } from "react";
 import {
+  Alert,
   Image,
   ScrollView,
   Text,
   TouchableOpacity,
   View
 } from "react-native";
+import { restockService } from "../../../services/restockService";
 import Modal from "../../components/Modal";
 
-// These return numbers (image resource IDs), not strings
+// Image imports
 const extraSmallImg = require("../../../assets/images/size-shirt/extra-small.png");
 const smallImg = require("../../../assets/images/size-shirt/small.png");
 const mediumImg = require("../../../assets/images/size-shirt/medium.png");
@@ -33,94 +35,71 @@ interface StockItem {
   returned: number;
 }
 
-const Restock = () => {
-  // Sample stock data - in real app, this would come from your database/API
-  const stockData: StockItem[] = [
-    {
-      key: "xs",
-      label: "Extra Small",
-      image: extraSmallImg,
-      stock: 15,
-      lowStockThreshold: 5,
-      reserved: 2,
-      rejected: 1,
-      returned: 0
-    },
-    {
-      key: "small",
-      label: "Small",
-      image: smallImg,
-      stock: 20,
-      lowStockThreshold: 5,
-      reserved: 3,
-      rejected: 0,
-      returned: 1
-    },
-    {
-      key: "medium",
-      label: "Medium",
-      image: mediumImg,
-      stock: 25,
-      lowStockThreshold: 5,
-      reserved: 5,
-      rejected: 2,
-      returned: 0
-    },
-    {
-      key: "large",
-      label: "Large",
-      image: largeImg,
-      stock: 18,
-      lowStockThreshold: 5,
-      reserved: 4,
-      rejected: 1,
-      returned: 2
-    },
-    {
-      key: "xl",
-      label: "Extra Large",
-      image: xlImg,
-      stock: 12,
-      lowStockThreshold: 5,
-      reserved: 2,
-      rejected: 3,
-      returned: 1
-    },
-    {
-      key: "xxl",
-      label: "2X Large",
-      image: xxlImg,
-      stock: 8,
-      lowStockThreshold: 5,
-      reserved: 1,
-      rejected: 2,
-      returned: 0
-    },
-    {
-      key: "xxxl",
-      label: "3X Large",
-      image: xxxlImg,
-      stock: 3,
-      lowStockThreshold: 5,
-      reserved: 0,
-      rejected: 1,
-      returned: 1
-    },
-  ];
+interface UserData {
+  id: number;
+  username: string;
+  name: string;
+  role: string;
+}
 
+const Restock = () => {
+  const params = useLocalSearchParams();
+  const [currentUser, setCurrentUser] = useState<UserData | null>(null);
+  const [stockData, setStockData] = useState<StockItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
   const [showItemModal, setShowItemModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Sample numbers for the new summary stats
-  const todaysRestocked = 45; // Total items added to restock today
-  const todaysSold = 28; // Total items sold/dropped today
-  const totalStock = 101; // Total stock added by user (cumulative)
-  
-  // New metrics
-  const totalReserved = stockData.reduce((sum, item) => sum + item.reserved, 0);
-  const totalRejected = stockData.reduce((sum, item) => sum + item.rejected, 0);
-  const totalReturned = stockData.reduce((sum, item) => sum + item.returned, 0);
+  // Parse user data
+  useEffect(() => {
+    const parseUserData = () => {
+      if (params.user) {
+        try {
+          const userData = JSON.parse(params.user as string);
+          setCurrentUser(userData);
+        } catch (error) {
+          console.error('Error parsing user data:', error);
+        }
+      }
+    };
+    
+    parseUserData();
+  }, [params.user]);
 
+  // Load stock data
+  useEffect(() => {
+    const loadStockData = async () => {
+      try {
+        setIsLoading(true);
+        const data = await restockService.getCurrentStock();
+        setStockData(data as StockItem[]);
+      } catch (error) {
+        console.error('Error loading stock data:', error);
+        Alert.alert('Error', 'Failed to load stock data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadStockData();
+  }, []);
+
+  // Calculate summary statistics
+  const summaryStats = React.useMemo(() => {
+    const totalStock = stockData.reduce((sum, item) => sum + item.stock, 0);
+    const totalReserved = stockData.reduce((sum, item) => sum + item.reserved, 0);
+    const totalRejected = stockData.reduce((sum, item) => sum + item.rejected, 0);
+    const totalReturned = stockData.reduce((sum, item) => sum + item.returned, 0);
+
+    return {
+      totalStock,
+      totalReserved,
+      totalRejected,
+      totalReturned
+    };
+  }, [stockData]);
+
+  // Helper functions
   const getStockStatusColor = (stock: number, lowStockThreshold: number) => {
     if (stock === 0) return "text-error";
     if (stock <= lowStockThreshold) return "text-warning";
@@ -143,14 +122,16 @@ const Restock = () => {
     return Math.min((stock / max) * 100, 100);
   };
 
-  // Calculate items needing restock from current stock data
-  const itemsNeedingRestock = stockData.filter(
-    (item) => item.stock <= item.lowStockThreshold
-  ).length;
-
   const handleAddRestock = () => {
-    console.log("Navigate to add restock screen");
-    router.replace('../(restock)/restock_config');
+    if (!currentUser) {
+      Alert.alert('Error', 'User not found');
+      return;
+    }
+
+    router.push({
+      pathname: '../(restock)/restock_config',
+      params: { user: JSON.stringify(currentUser) }
+    });
   };
 
   const handleItemPress = (item: StockItem) => {
@@ -158,9 +139,66 @@ const Restock = () => {
     setShowItemModal(true);
   };
 
+  const handleBackToDashboard = () => {
+    router.back();
+  };
+
   const formatNumber = (num: number) => {
     return num.toLocaleString();
   };
+
+  // Empty state component
+  const EmptyStockState = () => (
+    <View className="flex-1 justify-center items-center px-8">
+      <View className="bg-primary/10 rounded-full p-6 mb-4">
+        <Package size={48} color="#3B82F6" />
+      </View>
+      <Text className="text-primary text-xl font-bold text-center mb-2">
+        No Items Available
+      </Text>
+      <Text className="text-neutral-500 text-center mb-4">
+        There are no items available for restocking at the moment.
+      </Text>
+      <Text className="text-neutral-500 text-center mb-6">
+        Please contact the administrator to add items to the system.
+      </Text>
+      <TouchableOpacity 
+        className="bg-primary rounded-lg py-3 px-6"
+        onPress={handleBackToDashboard}
+      >
+        <Text className="text-white font-semibold text-lg">Back to Dashboard</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 bg-neutral-50 justify-center items-center">
+        <Text className="text-lg text-gray-700">Loading stock data...</Text>
+      </View>
+    );
+  }
+
+  // Show empty state if no items
+  if (stockData.length === 0) {
+    return (
+      <View className="flex-1 bg-neutral-50">
+        {/* Header */}
+        <View className="bg-primary p-4">
+          <Text className="text-white text-xl font-bold text-center">
+            Stock Management
+          </Text>
+          {currentUser && (
+            <Text className="text-accent-100 text-sm text-center mt-1">
+              Welcome, {currentUser.name}
+            </Text>
+          )}
+        </View>
+        
+        <EmptyStockState />
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-neutral-50">
@@ -169,6 +207,11 @@ const Restock = () => {
         <Text className="text-white text-xl font-bold text-center">
           Stock Management
         </Text>
+        {currentUser && (
+          <Text className="text-accent-100 text-sm text-center mt-1">
+            Welcome, {currentUser.name}
+          </Text>
+        )}
       </View>
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
@@ -176,73 +219,34 @@ const Restock = () => {
         <View className="mx-4 mt-4 bg-white rounded-xl shadow-lg border border-accent-100">
           <View className="p-4 border-b border-accent-100">
             <Text className="text-primary text-xl font-bold text-center">
-              Today's Summary
+              Stock Summary
             </Text>
           </View>
 
           <View className="p-4">
             {/* Main Stats Row */}
             <View className="flex-row justify-between mb-4">
-              {/* Today's Restocked */}
-              <View className="items-center flex-1">
-                <View className="bg-success/20 p-3 rounded-full mb-2">
-                  <Text className="text-success text-lg font-bold">
-                    {todaysRestocked}
-                  </Text>
-                </View>
-                <Text className="text-neutral-500 text-xs text-center">
-                  Today's Restocked
-                </Text>
-                <Text className="text-success text-xs font-medium mt-1">
-                  +{todaysRestocked} items
-                </Text>
-              </View>
-
-              {/* Today's Sold */}
-              <View className="items-center flex-1">
-                <View className="bg-error/20 p-3 rounded-full mb-2">
-                  <Text className="text-error text-lg font-bold">
-                    {todaysSold}
-                  </Text>
-                </View>
-                <Text className="text-neutral-500 text-xs text-center">
-                  Today's Sold
-                </Text>
-                <Text className="text-error text-xs font-medium mt-1">
-                  -{todaysSold} items
-                </Text>
-              </View>
-
               {/* Total Stock */}
               <View className="items-center flex-1">
                 <View className="bg-primary/20 p-3 rounded-full mb-2">
                   <Text className="text-primary text-lg font-bold">
-                    {totalStock}
+                    {summaryStats.totalStock}
                   </Text>
                 </View>
                 <Text className="text-neutral-500 text-xs text-center">
                   Total Stock
                 </Text>
-                <Text className="text-primary text-xs font-medium mt-1">
-                  Overall inventory
-                </Text>
               </View>
-            </View>
 
-            {/* Additional Metrics Row */}
-            <View className="flex-row justify-between mb-4">
               {/* Reserved Items */}
               <View className="items-center flex-1">
                 <View className="bg-blue-100 p-3 rounded-full mb-2">
                   <Text className="text-blue-600 text-lg font-bold">
-                    {totalReserved}
+                    {summaryStats.totalReserved}
                   </Text>
                 </View>
                 <Text className="text-neutral-500 text-xs text-center">
                   Reserved
-                </Text>
-                <Text className="text-blue-600 text-xs font-medium mt-1">
-                  On hold
                 </Text>
               </View>
 
@@ -250,63 +254,30 @@ const Restock = () => {
               <View className="items-center flex-1">
                 <View className="bg-orange-100 p-3 rounded-full mb-2">
                   <Text className="text-orange-600 text-lg font-bold">
-                    {totalRejected}
+                    {summaryStats.totalRejected}
                   </Text>
                 </View>
                 <Text className="text-neutral-500 text-xs text-center">
                   Rejected
                 </Text>
-                <Text className="text-orange-600 text-xs font-medium mt-1">
-                  Quality issues
-                </Text>
-              </View>
-
-              {/* Returned Items */}
-              <View className="items-center flex-1">
-                <View className="bg-purple-100 p-3 rounded-full mb-2">
-                  <Text className="text-purple-600 text-lg font-bold">
-                    {totalReturned}
-                  </Text>
-                </View>
-                <Text className="text-neutral-500 text-xs text-center">
-                  Returned
-                </Text>
-                <Text className="text-purple-600 text-xs font-medium mt-1">
-                  Customer returns
-                </Text>
               </View>
             </View>
 
-            {/* Net Change Indicator */}
+            {/* Items Count */}
             <View className="bg-neutral-50 rounded-lg p-3 mt-2">
-              <View className="flex-row justify-between items-center mb-2">
+              <View className="flex-row justify-between items-center">
                 <Text className="text-primary font-semibold">
-                  Daily Net Change
+                  Available Items
                 </Text>
-                <Text
-                  className={`text-sm font-medium ${
-                    todaysRestocked > todaysSold ? "text-success" : "text-error"
-                  }`}
-                >
-                  {todaysRestocked > todaysSold ? "+" : ""}
-                  {todaysRestocked - todaysSold} items
-                </Text>
+                <View className="bg-primary rounded-full px-3 py-1">
+                  <Text className="text-white font-bold">
+                    {stockData.length}
+                  </Text>
+                </View>
               </View>
-              <View className="w-full bg-accent-100 rounded-full h-2">
-                <View
-                  className={`h-2 rounded-full ${
-                    todaysRestocked > todaysSold ? "bg-success" : "bg-error"
-                  }`}
-                  style={{
-                    width: `${Math.min((Math.abs(todaysRestocked - todaysSold) / Math.max(todaysRestocked, todaysSold)) * 100, 100)}%`,
-                  }}
-                />
-              </View>
-              <View className="flex-row justify-between mt-1">
-                <Text className="text-neutral-500 text-xs">More Sales</Text>
-                <Text className="text-neutral-500 text-xs">Balanced</Text>
-                <Text className="text-neutral-500 text-xs">More Restocks</Text>
-              </View>
+              <Text className="text-neutral-500 text-xs mt-1">
+                enabled items in system
+              </Text>
             </View>
           </View>
         </View>

@@ -365,23 +365,31 @@ const Configuration = () => {
 
 const toggleItemStatus = async (itemKey: string) => {
   try {
-
-    setItems(prevItems => 
-      prevItems.map(item => 
-        item.key === itemKey ? { ...item, enabled: !item.enabled } : item
-      )
-    );
-
+    // First get the current item data from database
     const itemsData = await itemService.getItems();
     const dbItem = itemsData.find((dbItem: any) => dbItem.key === itemKey);
     
     if (dbItem) {
-      await itemService.updateItem(dbItem.id, { enabled: !items.find(item => item.key === itemKey)?.enabled });
+      // Calculate the new enabled status
+      const newEnabledStatus = !dbItem.enabled;
+      
+      // Update in database first
+      await itemService.updateItem(dbItem.id, { 
+        enabled: newEnabledStatus 
+      });
+      
+      // Then update local state
+      setItems(prevItems => 
+        prevItems.map(item => 
+          item.key === itemKey ? { ...item, enabled: newEnabledStatus } : item
+        )
+      );
     }
   } catch (error) {
     console.error('Error updating item status:', error);
     Alert.alert('Error', 'Failed to update item status');
     
+    // Reload data to sync with database in case of error
     await loadData(); 
   }
 };
@@ -486,7 +494,8 @@ const toggleCollegeStatus = async (collegeId: string) => {
         stock: newItem.stock,
         rejected: newItem.rejected,
         low_stock_threshold: newItem.lowStockThreshold,
-        enabled: newItem.enabled
+        enabled: newItem.enabled,
+        reserved: 0
       });
 
       setShowAddItemModal(false);
@@ -796,8 +805,6 @@ const toggleCollegeStatus = async (collegeId: string) => {
           setSessionTimeout={setSessionTimeout}
           loginAttempts={loginAttempts}
           setLoginAttempts={setLoginAttempts}
-          saveConfiguration={saveConfiguration}
-          handleResetToDefaults={handleResetToDefaults}
           FeatureToggle={FeatureToggle}
           NumberInput={NumberInput}
         />
@@ -877,26 +884,8 @@ const toggleCollegeStatus = async (collegeId: string) => {
 };
 
 // ===== TAB COMPONENTS =====
-const SettingsTab = ({ features, toggleFeature, sessionTimeout, setSessionTimeout, loginAttempts, setLoginAttempts, saveConfiguration, handleResetToDefaults, FeatureToggle, NumberInput }: any) => (
+const SettingsTab = ({ features, toggleFeature, sessionTimeout, setSessionTimeout, loginAttempts, setLoginAttempts, FeatureToggle, NumberInput }: any) => (
   <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-    {/* Action Buttons */}
-    <View className="mx-4 mt-4 flex-row justify-between">
-      <TouchableOpacity 
-        className="bg-white rounded-xl p-4 shadow-sm border border-accent-100 flex-1 mr-2 items-center flex-row justify-center"
-        onPress={saveConfiguration}
-      >
-        <Save size={16} color="#3B82F6" />
-        <Text className="text-primary font-semibold ml-2">Save Changes</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity 
-        className="bg-white rounded-xl p-4 shadow-sm border border-accent-100 flex-1 ml-2 items-center flex-row justify-center"
-        onPress={handleResetToDefaults}
-      >
-        <RotateCcw size={16} color="#EF4444" />
-        <Text className="text-error font-semibold ml-2">Reset Defaults</Text>
-      </TouchableOpacity>
-    </View>
 
     {/* Shop Configuration */}
     <View className="mx-4 mt-6 bg-white rounded-xl shadow-sm border border-accent-100">

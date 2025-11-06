@@ -1,51 +1,210 @@
-// app/(tabs)/index.tsx
-import { useRouter } from 'expo-router';
-import { LogOut } from 'lucide-react-native';
-import React from 'react';
+// app/(user)/(tabs)/index.tsx
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { LogOut, Package, ShoppingCart, TrendingUp, User } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  RefreshControl,
   ScrollView,
   Text,
   TouchableOpacity,
   View
 } from 'react-native';
+import { itemService, userService } from '../../../services/database';
 
-const index = () => {
+interface UserData {
+  id: number;
+  username: string;
+  name: string;
+  role: string;
+}
+
+interface UserStats {
+  todaySold: number;
+  todayRevenue: number;
+  todayRestock: number;
+  totalSold: number;
+  totalRevenue: number;
+  lastActive: string;
+}
+
+interface LowStockItem {
+  key: string;
+  label: string;
+  stock: number;
+  lowStockThreshold: number;
+}
+
+const UserIndex = () => {
   const router = useRouter();
+  const params = useLocalSearchParams();
+  
+  const [currentUser, setCurrentUser] = useState<UserData | null>(null);
+  const [userStats, setUserStats] = useState<UserStats>({
+    todaySold: 0,
+    todayRevenue: 0,
+    todayRestock: 0,
+    totalSold: 0,
+    totalRevenue: 0,
+    lastActive: 'Never'
+  });
+  const [lowStockItems, setLowStockItems] = useState<LowStockItem[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Sample data for dashboard
-  const dashboardStats = {
-    totalItems: 102,
-    lowStockItems: 3,
-    todaysSales: 28,
-    needRestock: 2
+  // Parse user data from params (only once on mount)
+  useEffect(() => {
+    const parseUserData = () => {
+      if (params.user) {
+        try {
+          const userData = JSON.parse(params.user as string);
+          return userData;
+        } catch (error) {
+          console.error('Error parsing user data:', error);
+          // Fallback: try to get from individual params
+          if (params.userId && params.userName) {
+            return {
+              id: parseInt(params.userId as string),
+              username: params.userUsername as string || params.userId as string,
+              name: params.userName as string,
+              role: params.userRole as string || 'cashier'
+            };
+          }
+        }
+      }
+      return null;
+    };
+
+    const userData = parseUserData();
+    setCurrentUser(userData);
+  }, []); // Empty dependency array - only run once on mount
+
+  // Load user stats and low stock items
+  useEffect(() => {
+    const loadData = async () => {
+      if (!currentUser) return;
+
+      try {
+        setIsLoading(true);
+        
+        // Load user-specific stats
+        const user = await userService.getUserById(currentUser.id);
+        if (user) {
+          setUserStats({
+            todaySold: user.today_sold || 0,
+            todayRevenue: user.today_revenue || 0,
+            todayRestock: user.today_restock || 0,
+            totalSold: user.total_sold || 0,
+            totalRevenue: user.total_revenue || 0,
+            lastActive: user.last_active || 'Never'
+          });
+        }
+
+        // Load low stock items
+        const items = await itemService.getItems();
+        const lowStock = items
+          .filter((item: any) => item.enabled && (item.stock || 0) <= (item.low_stock_threshold || 5))
+          .map((item: any) => ({
+            key: item.key,
+            label: item.label,
+            stock: item.stock || 0,
+            lowStockThreshold: item.low_stock_threshold || 5
+          }));
+        
+        setLowStockItems(lowStock);
+      } catch (error) {
+        console.error('Error loading data:', error);
+        Alert.alert('Error', 'Failed to load dashboard data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [currentUser]); // Only run when currentUser changes
+
+  // Fallback: if no user from params, try to get from database
+  useEffect(() => {
+    const loadFallbackUser = async () => {
+      if (currentUser) return; // If we already have a user, don't load fallback
+
+      try {
+        const users = await userService.getUsers();
+        const cashierUser = users.find((user: any) => user.role === 'cashier' && user.status === 'active');
+        if (cashierUser) {
+          const userData = {
+            id: cashierUser.id,
+            username: cashierUser.username,
+            name: cashierUser.name,
+            role: cashierUser.role
+          };
+          setCurrentUser(userData);
+        }
+      } catch (error) {
+        console.error('Error loading fallback user:', error);
+      }
+    };
+
+    // Only try fallback if we don't have a user after a short delay
+    const timer = setTimeout(() => {
+      if (!currentUser) {
+        loadFallbackUser();
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [currentUser]); // Only run when currentUser changes
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      if (currentUser) {
+        // Reload user stats
+        const user = await userService.getUserById(currentUser.id);
+        if (user) {
+          setUserStats({
+            todaySold: user.today_sold || 0,
+            todayRevenue: user.today_revenue || 0,
+            todayRestock: user.today_restock || 0,
+            totalSold: user.total_sold || 0,
+            totalRevenue: user.total_revenue || 0,
+            lastActive: user.last_active || 'Never'
+          });
+        }
+
+        // Reload low stock items
+        const items = await itemService.getItems();
+        const lowStock = items
+          .filter((item: any) => item.enabled && (item.stock || 0) <= (item.low_stock_threshold || 5))
+          .map((item: any) => ({
+            key: item.key,
+            label: item.label,
+            stock: item.stock || 0,
+            lowStockThreshold: item.low_stock_threshold || 5
+          }));
+        
+        setLowStockItems(lowStock);
+      }
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setRefreshing(false);
+    }
   };
-
-  // Sample low stock items
-  const lowStockItems = [
-    { size: 'XXXL', currentStock: 3, threshold: 5, status: 'critical' },
-    { size: 'XXL', currentStock: 8, threshold: 10, status: 'warning' },
-    { size: 'XL', currentStock: 12, threshold: 15, status: 'warning' }
-  ];
-
-  // Sample recent activity
-  const recentActivity = [
-    { action: 'restock', items: 45, time: '2 hours ago', size: 'Multiple' },
-    { action: 'sale', items: 15, time: '4 hours ago', size: 'Medium' },
-    { action: 'restock', items: 20, time: 'Yesterday', size: 'Large' },
-    { action: 'sale', items: 8, time: 'Yesterday', size: 'Small' }
-  ];
 
   const handleQuickAction = (action: string) => {
     switch (action) {
       case 'shop':
-        router.push('/shop');
+        router.push('/(user)/(tabs)/shop');
         break;
       case 'restock':
-        router.push('/restock');
+        router.push('/(user)/(tabs)/restock');
         break;
       case 'add-restock':
         router.push('../(restock)/restock_config');
+        break;
+      case 'analytics':
+        router.push('/(user)/(tabs)/analytics');
         break;
       default:
         Alert.alert('Action', `${action} clicked`);
@@ -62,7 +221,6 @@ const index = () => {
           text: 'Logout',
           style: 'destructive',
           onPress: () => {
-            // Navigate directly to your auth login
             router.replace('/(auth)/login');
           }
         }
@@ -70,39 +228,61 @@ const index = () => {
     );
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'critical': return 'bg-error';
-      case 'warning': return 'bg-warning';
-      default: return 'bg-success';
-    }
+  const formatCurrency = (amount: number) => {
+    return `₱${amount.toLocaleString()}`;
   };
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'critical': return 'Critical';
-      case 'warning': return 'Low';
-      default: return 'Good';
-    }
+  const formatNumber = (number: number) => {
+    return number.toLocaleString();
   };
 
-  const getActivityIcon = (action: string) => {
-    return action === 'restock' ? '📦' : '💰';
+  const getStatusColor = (stock: number, threshold: number) => {
+    if (stock === 0) return 'bg-error';
+    if (stock <= threshold) return 'bg-warning';
+    return 'bg-success';
   };
 
-  const getActivityColor = (action: string) => {
-    return action === 'restock' ? 'text-success' : 'text-secondary';
+  const getStatusText = (stock: number, threshold: number) => {
+    if (stock === 0) return 'Out of Stock';
+    if (stock <= threshold) return 'Low Stock';
+    return 'In Stock';
   };
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 bg-neutral-50 justify-center items-center">
+        <Text className="text-lg text-gray-700">Loading dashboard...</Text>
+        <Text className="text-sm text-gray-500 mt-2">Please wait</Text>
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-neutral-50">
-      {/* Header with Logout Button */}
+      {/* Enhanced Header with User Info */}
       <View className="bg-primary p-6 pt-12 pb-4">
         <View className="flex-row justify-between items-start">
           <View className="flex-1">
-            <Text className="text-white text-2xl font-bold">Inventory Dashboard</Text>
-            <Text className="text-accent-100 text-sm mt-1">
-              Welcome back! Here's your inventory overview
+            <View className="flex-row items-center mb-2">
+              <View className="bg-white/20 rounded-full p-2 mr-3">
+                <User size={16} color="white" />
+              </View>
+              <View>
+                <Text className="text-white text-2xl font-bold">
+                  {currentUser ? `Welcome, ${currentUser.name}` : 'Cashier Dashboard'}
+                </Text>
+                {currentUser && (
+                  <Text className="text-accent-100 text-xs mt-1">
+                    @{currentUser.username} • {currentUser.role}
+                  </Text>
+                )}
+              </View>
+            </View>
+            <Text className="text-accent-100 text-sm">
+              {currentUser ? 'Ready for today\'s sales!' : 'Welcome back!'}
+            </Text>
+            <Text className="text-accent-100 text-xs mt-1">
+              Last active: {userStats.lastActive}
             </Text>
           </View>
           
@@ -115,83 +295,89 @@ const index = () => {
         </View>
       </View>
 
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        {/* Quick Stats Overview */}
+      <ScrollView 
+        className="flex-1" 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {/* Today's Performance Stats */}
         <View className="mx-4 mt-4">
           <Text className="text-primary text-xl font-bold mb-3">
-            Quick Overview
+            Today's Performance
           </Text>
           
           <View className="flex-row flex-wrap justify-between">
-            {/* Total Items Card */}
-            <View className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-accent-100 w-[48%]">
-              <View className="flex-row items-center justify-between">
-                <View>
-                  <Text className="text-neutral-500 text-sm">Total Items</Text>
-                  <Text className="text-primary text-2xl font-bold mt-1">
-                    {dashboardStats.totalItems}
-                  </Text>
-                </View>
-                <View className="bg-primary/20 p-2 rounded-lg">
-                  <Text className="text-primary text-lg">👕</Text>
-                </View>
-              </View>
-              <Text className="text-success text-xs font-medium mt-2">
-                +12% from last week
-              </Text>
-            </View>
-
-            {/* Low Stock Card */}
-            <View className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-accent-100 w-[48%]">
-              <View className="flex-row items-center justify-between">
-                <View>
-                  <Text className="text-neutral-500 text-sm">Low Stock</Text>
-                  <Text className="text-warning text-2xl font-bold mt-1">
-                    {dashboardStats.lowStockItems}
-                  </Text>
-                </View>
-                <View className="bg-warning/20 p-2 rounded-lg">
-                  <Text className="text-warning text-lg">⚠️</Text>
-                </View>
-              </View>
-              <Text className="text-warning text-xs font-medium mt-2">
-                Needs attention
-              </Text>
-            </View>
-
             {/* Today's Sales Card */}
-            <View className="bg-white rounded-xl p-4 shadow-sm border border-accent-100 w-[48%]">
+            <View className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-accent-100 w-[48%]">
               <View className="flex-row items-center justify-between">
                 <View>
                   <Text className="text-neutral-500 text-sm">Today's Sales</Text>
                   <Text className="text-secondary text-2xl font-bold mt-1">
-                    {dashboardStats.todaysSales}
+                    {formatNumber(userStats.todaySold)}
                   </Text>
                 </View>
                 <View className="bg-secondary/20 p-2 rounded-lg">
-                  <Text className="text-secondary text-lg">💰</Text>
+                  <ShoppingCart size={20} color="#831843" />
                 </View>
               </View>
               <Text className="text-success text-xs font-medium mt-2">
-                Good performance
+                {formatCurrency(userStats.todayRevenue)} revenue
               </Text>
             </View>
 
-            {/* Need Restock Card */}
+            {/* Today's Restock Card */}
+            <View className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-accent-100 w-[48%]">
+              <View className="flex-row items-center justify-between">
+                <View>
+                  <Text className="text-neutral-500 text-sm">Today's Restock</Text>
+                  <Text className="text-success text-2xl font-bold mt-1">
+                    {formatNumber(userStats.todayRestock)}
+                  </Text>
+                </View>
+                <View className="bg-success/20 p-2 rounded-lg">
+                  <Package size={20} color="#10B981" />
+                </View>
+              </View>
+              <Text className="text-success text-xs font-medium mt-2">
+                Items added today
+              </Text>
+            </View>
+
+            {/* Total Sales Card */}
             <View className="bg-white rounded-xl p-4 shadow-sm border border-accent-100 w-[48%]">
               <View className="flex-row items-center justify-between">
                 <View>
-                  <Text className="text-neutral-500 text-sm">Need Restock</Text>
-                  <Text className="text-tertiary text-2xl font-bold mt-1">
-                    {dashboardStats.needRestock}
+                  <Text className="text-neutral-500 text-sm">Total Sales</Text>
+                  <Text className="text-primary text-2xl font-bold mt-1">
+                    {formatNumber(userStats.totalSold)}
                   </Text>
                 </View>
-                <View className="bg-tertiary/20 p-2 rounded-lg">
-                  <Text className="text-tertiary text-lg">📦</Text>
+                <View className="bg-primary/20 p-2 rounded-lg">
+                  <TrendingUp size={20} color="#3B82F6" />
                 </View>
               </View>
-              <Text className="text-tertiary text-xs font-medium mt-2">
-                Review required
+              <Text className="text-primary text-xs font-medium mt-2">
+                All time sales
+              </Text>
+            </View>
+
+            {/* Total Revenue Card */}
+            <View className="bg-white rounded-xl p-4 shadow-sm border border-accent-100 w-[48%]">
+              <View className="flex-row items-center justify-between">
+                <View>
+                  <Text className="text-neutral-500 text-sm">Total Revenue</Text>
+                  <Text className="text-success text-2xl font-bold mt-1">
+                    {formatCurrency(userStats.totalRevenue)}
+                  </Text>
+                </View>
+                <View className="bg-success/20 p-2 rounded-lg">
+                  <Text className="text-success text-lg">💰</Text>
+                </View>
+              </View>
+              <Text className="text-success text-xs font-medium mt-2">
+                Lifetime earnings
               </Text>
             </View>
           </View>
@@ -209,11 +395,11 @@ const index = () => {
               onPress={() => handleQuickAction('shop')}
             >
               <View className="bg-primary/20 p-3 rounded-full mb-2">
-                <Text className="text-primary text-xl">🛒</Text>
+                <ShoppingCart size={24} color="#3B82F6" />
               </View>
-              <Text className="text-primary font-semibold text-center">Shop</Text>
+              <Text className="text-primary font-semibold text-center">Process Sale</Text>
               <Text className="text-neutral-500 text-xs text-center mt-1">
-                Process Sales
+                Sell Items
               </Text>
             </TouchableOpacity>
 
@@ -222,7 +408,7 @@ const index = () => {
               onPress={() => handleQuickAction('restock')}
             >
               <View className="bg-secondary/20 p-3 rounded-full mb-2">
-                <Text className="text-secondary text-xl">📊</Text>
+                <Package size={24} color="#831843" />
               </View>
               <Text className="text-secondary font-semibold text-center">View Stock</Text>
               <Text className="text-neutral-500 text-xs text-center mt-1">
@@ -245,40 +431,40 @@ const index = () => {
           </View>
         </View>
 
-        {/* Low Stock Alert Section */}
-        {dashboardStats.lowStockItems > 0 && (
+        {/* Low Stock Alerts */}
+        {lowStockItems.length > 0 && (
           <View className="mx-4 mt-6">
             <View className="flex-row justify-between items-center mb-3">
               <Text className="text-primary text-xl font-bold">
                 Low Stock Alerts
               </Text>
               <Text className="text-error text-sm font-medium">
-                {dashboardStats.lowStockItems} items need attention
+                {lowStockItems.length} item{lowStockItems.length !== 1 ? 's' : ''} need attention
               </Text>
             </View>
             
             <View className="bg-warning/10 rounded-xl p-4 border border-warning/20">
               {lowStockItems.map((item, index) => (
                 <View 
-                  key={item.size}
+                  key={item.key}
                   className={`flex-row justify-between items-center py-2 ${
                     index !== lowStockItems.length - 1 ? 'border-b border-warning/20' : ''
                   }`}
                 >
                   <View className="flex-row items-center">
-                    <View className={`w-3 h-3 rounded-full mr-3 ${getStatusColor(item.status)}`} />
-                    <Text className="text-primary font-medium">{item.size}</Text>
+                    <View className={`w-3 h-3 rounded-full mr-3 ${getStatusColor(item.stock, item.lowStockThreshold)}`} />
+                    <Text className="text-primary font-medium">{item.label}</Text>
                   </View>
                   <View className="flex-row items-center">
                     <Text className="text-neutral-500 text-sm mr-3">
-                      {item.currentStock} / {item.threshold}
+                      {item.stock} / {item.lowStockThreshold}
                     </Text>
                     <Text className={`text-xs font-medium px-2 py-1 rounded-full ${
-                      item.status === 'critical' 
+                      item.stock === 0 
                         ? 'bg-error/20 text-error' 
                         : 'bg-warning/20 text-warning'
                     }`}>
-                      {getStatusText(item.status)}
+                      {getStatusText(item.stock, item.lowStockThreshold)}
                     </Text>
                   </View>
                 </View>
@@ -294,54 +480,36 @@ const index = () => {
           </View>
         )}
 
-        {/* Recent Activity */}
+        {/* Performance Summary */}
         <View className="mx-4 mt-6 mb-8">
           <Text className="text-primary text-xl font-bold mb-3">
-            Recent Activity
+            Your Performance Summary
           </Text>
           
           <View className="bg-white rounded-xl shadow-sm border border-accent-100 overflow-hidden">
-            {recentActivity.map((activity, index) => (
-              <View 
-                key={index}
-                className={`flex-row items-center p-4 ${
-                  index !== recentActivity.length - 1 ? 'border-b border-accent-100' : ''
-                }`}
-              >
-                <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
-                  activity.action === 'restock' ? 'bg-success/20' : 'bg-secondary/20'
-                }`}>
-                  <Text className={getActivityColor(activity.action)}>
-                    {getActivityIcon(activity.action)}
-                  </Text>
-                </View>
-                
-                <View className="flex-1">
-                  <Text className="text-primary font-medium">
-                    {activity.action === 'restock' ? 'Stock Added' : 'Sale Completed'}
-                  </Text>
-                  <Text className="text-neutral-500 text-xs">
-                    {activity.size} • {activity.time}
-                  </Text>
-                </View>
-                
-                <View className={`items-end ${getActivityColor(activity.action)}`}>
-                  <Text className={`font-bold ${getActivityColor(activity.action)}`}>
-                    {activity.action === 'restock' ? '+' : '-'}{activity.items}
-                  </Text>
-                  <Text className="text-neutral-500 text-xs">
-                    items
-                  </Text>
-                </View>
-              </View>
-            ))}
+            <View className="flex-row justify-between items-center p-4 border-b border-accent-100">
+              <Text className="text-primary font-semibold">Metric</Text>
+              <Text className="text-primary font-semibold">Today</Text>
+              <Text className="text-primary font-semibold">Total</Text>
+            </View>
             
-            <TouchableOpacity 
-              className="p-4 border-t border-accent-100 items-center"
-              onPress={() => handleQuickAction('restock')}
-            >
-              <Text className="text-primary font-semibold">View All Activity</Text>
-            </TouchableOpacity>
+            <View className="flex-row justify-between items-center p-4 border-b border-accent-100">
+              <Text className="text-neutral-600">Items Sold</Text>
+              <Text className="text-secondary font-bold">{formatNumber(userStats.todaySold)}</Text>
+              <Text className="text-primary font-bold">{formatNumber(userStats.totalSold)}</Text>
+            </View>
+            
+            <View className="flex-row justify-between items-center p-4 border-b border-accent-100">
+              <Text className="text-neutral-600">Revenue</Text>
+              <Text className="text-success font-bold">{formatCurrency(userStats.todayRevenue)}</Text>
+              <Text className="text-success font-bold">{formatCurrency(userStats.totalRevenue)}</Text>
+            </View>
+            
+            <View className="flex-row justify-between items-center p-4">
+              <Text className="text-neutral-600">Restocks</Text>
+              <Text className="text-success font-bold">{formatNumber(userStats.todayRestock)}</Text>
+              <Text className="text-primary font-bold">-</Text>
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -349,4 +517,4 @@ const index = () => {
   );
 };
 
-export default index;
+export default UserIndex;

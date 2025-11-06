@@ -1,4 +1,5 @@
-import { Tabs } from "expo-router";
+// app/(user)/(tabs)/_layout.tsx
+import { Tabs, useLocalSearchParams } from "expo-router";
 import {
   ChartArea,
   House,
@@ -18,9 +19,9 @@ type TabIconProps = {
 const TabIcon = ({ title, icon, focused }: TabIconProps) => {
   if (focused) {
     return (
-      <View className="bg-[#ffe4e4] min-w-[90px] min-h-14 rounded-lg flex-1 justify-center items-center">
+      <View className="bg-primary/10 min-w-[90px] min-h-14 rounded-lg flex-1 justify-center items-center">
         {icon}
-        <Text className="text-sm font-medium text-neutral-800">{title}</Text>
+        <Text className="text-sm font-medium text-primary">{title}</Text>
       </View>
     );
   }
@@ -32,11 +33,13 @@ const TabIcon = ({ title, icon, focused }: TabIconProps) => {
   );
 };
 
-const TabLayout = () => {
+const UserTabLayout = () => {
+  const params = useLocalSearchParams();
+  
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: "#831843",
+        tabBarActiveTintColor: "#3B82F6",
         tabBarShowLabel: false,
         tabBarStyle: {
           paddingTop: 10,
@@ -44,21 +47,21 @@ const TabLayout = () => {
         },
       }}
     >
-        
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: "Dashboard",
           headerShown: false,
           tabBarIcon: ({ color, focused }) => (
             <TabIcon
               focused={focused}
-              title="Home"
+              title="Dashboard"
               color={color}
               icon={<House size={20} color={color} />}
             />
           ),
         }}
+        initialParams={params} // Pass params to index
       />
 
       <Tabs.Screen
@@ -75,6 +78,7 @@ const TabLayout = () => {
             />
           ),
         }}
+        initialParams={params} // Pass params to shop
       />
 
       <Tabs.Screen
@@ -91,6 +95,7 @@ const TabLayout = () => {
             />
           ),
         }}
+        initialParams={params} // Pass params to restock
       />
 
       <Tabs.Screen
@@ -107,10 +112,10 @@ const TabLayout = () => {
             />
           ),
         }}
+        initialParams={params} // Pass params to analytics
       />
-
     </Tabs>
   );
 };
 
-export default TabLayout;
+export default UserTabLayout;

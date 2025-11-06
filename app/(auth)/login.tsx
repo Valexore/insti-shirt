@@ -59,62 +59,95 @@ const Login = () => {
     setShowErrorModal(true);
   };
 
-const handleLogin = async () => {
-  // Simple validation
-  if (!username || !password) {
-    showError('Please fill in all fields');
-    return;
-  }
-
-  if (!isDbInitialized) {
-    showError('App is still initializing. Please wait...');
-    return;
-  }
-
-  setIsLoading(true);
-
-  try {
-    console.log('Attempting login with:', { username, password });
-    
-    const user = await userService.login(username, password);
-    
-    console.log('Login successful:', user);
-    
-    // If login is successful, user will be returned
-    if (user.role === 'admin') {
-      router.replace('../(admin)');
-    } else {
-      router.replace('../(user)');
+  const handleLogin = async () => {
+    // Simple validation
+    if (!username || !password) {
+      showError('Please fill in all fields');
+      return;
     }
-    
-  } catch (error: unknown) {
-    // REMOVE THIS LINE: console.error('Login error:', error);
-    
-    // Handle specific error types with modal
-    if (error instanceof Error) {
-      if (error.message.includes('no such table')) {
-        showError('Database not properly initialized. Please restart the app.');
-      } else if (error.message.includes('Invalid credentials or inactive account')) {
-        showError('Invalid username or password. Please check your credentials and make sure your account is active.');
+
+    if (!isDbInitialized) {
+      showError('App is still initializing. Please wait...');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      console.log('Attempting login with:', { username, password });
+      
+      const user = await userService.login(username, password);
+      
+      console.log('Login successful:', user);
+      
+      // Prepare user data to pass to the next screen
+      const userData = {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        role: user.role
+      };
+      
+      // If login is successful, navigate with user data
+      if (user.role === 'admin') {
+        router.replace('../(admin)');
       } else {
-        showError(error.message);
+        // Pass user data to user section with multiple formats for reliability
+        router.replace({
+          pathname: '../(user)',
+          params: { 
+            user: JSON.stringify(userData),
+            userId: user.id.toString(),
+            userName: user.name,
+            userUsername: user.username,
+            userRole: user.role
+          }
+        });
       }
-    } else {
-      showError('Invalid credentials or network error. Please try again.');
+      
+    } catch (error: unknown) {
+      // Handle specific error types with modal
+      if (error instanceof Error) {
+        if (error.message.includes('no such table')) {
+          showError('Database not properly initialized. Please restart the app.');
+        } else if (error.message.includes('Invalid credentials or inactive account')) {
+          showError('Invalid username or password. Please check your credentials and make sure your account is active.');
+        } else {
+          showError(error.message);
+        }
+      } else {
+        showError('Invalid credentials or network error. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
     }
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   const handleQuickNavigate = (role: 'user' | 'admin') => {
+    // Create mock user data for quick navigation
+    const mockUserData = {
+      id: role === 'admin' ? 1 : 2,
+      username: role === 'admin' ? 'admin' : 'cashier',
+      name: role === 'admin' ? 'Admin User' : 'Cashier User',
+      role: role
+    };
+
     Alert.alert(
       'Quick Navigation',
       `Navigating to ${role} section`,
       [
         {
           text: 'OK',
-          onPress: () => router.replace(`../(${role})`)
+          onPress: () => router.replace({
+            pathname: `../(${role})`,
+            params: { 
+              user: JSON.stringify(mockUserData),
+              userId: mockUserData.id.toString(),
+              userName: mockUserData.name,
+              userUsername: mockUserData.username,
+              userRole: mockUserData.role
+            }
+          })
         }
       ]
     );
@@ -226,13 +259,15 @@ const handleLogin = async () => {
                 </Text>
               </TouchableOpacity>
 
-              {/* Admin Test Button */}
+              {/* Test Login Buttons */}
               <View className="mt-6 border-t border-gray-300 pt-6">
                 <Text className="text-gray-700 font-semibold mb-3 text-center">
-                  Quick Admin Login
+                  Quick Test Logins
                 </Text>
+                
+                {/* Admin Test Button */}
                 <TouchableOpacity
-                  className="bg-green-500 rounded-lg py-3"
+                  className="bg-green-500 rounded-lg py-3 mb-3"
                   onPress={handleAdminLogin}
                   disabled={isLoading}
                 >
@@ -240,7 +275,7 @@ const handleLogin = async () => {
                     Login as Admin
                   </Text>
                 </TouchableOpacity>
-                <Text className="text-gray-500 text-xs text-center mt-2">
+                <Text className="text-gray-500 text-xs text-center mb-4">
                   Uses: admin / 123
                 </Text>
               </View>
@@ -271,6 +306,9 @@ const handleLogin = async () => {
                     </Text>
                   </TouchableOpacity>
                 </View>
+                <Text className="text-gray-500 text-xs text-center mt-2">
+                  Bypasses login for testing
+                </Text>
               </View>
             </View>
           </View>
@@ -278,36 +316,35 @@ const handleLogin = async () => {
       </ScrollView>
 
       {/* Error Modal */}
-{/* Simpler Error Modal */}
-<Modal
-  visible={showErrorModal}
-  onClose={() => setShowErrorModal(false)}
-  title="Login Error"
-  showCloseButton={true}
->
-  <View className="p-4">
-    <View className="bg-white rounded-xl p-4 shadow-sm border border-accent-100">
-      <View className="items-center mb-4">
-        <View className="bg-error/20 p-3 rounded-full mb-3">
-          <X size={32} color="#EF4444" />
-        </View>
-        <Text className="text-error text-lg font-bold text-center mb-2">
-          Login Failed
-        </Text>
-        <Text className="text-neutral-600 text-center">
-          {errorMessage}
-        </Text>
-      </View>
-      
-      <TouchableOpacity
-        className="bg-primary rounded-lg py-3 px-4 mt-2 items-center"
-        onPress={() => setShowErrorModal(false)}
+      <Modal
+        visible={showErrorModal}
+        onClose={() => setShowErrorModal(false)}
+        title="Login Error"
+        showCloseButton={true}
       >
-        <Text className="text-white font-semibold text-lg">Try Again</Text>
-      </TouchableOpacity>
-    </View>
-  </View>
-</Modal>
+        <View className="p-4">
+          <View className="bg-white rounded-xl p-4 shadow-sm border border-accent-100">
+            <View className="items-center mb-4">
+              <View className="bg-error/20 p-3 rounded-full mb-3">
+                <X size={32} color="#EF4444" />
+              </View>
+              <Text className="text-error text-lg font-bold text-center mb-2">
+                Login Failed
+              </Text>
+              <Text className="text-neutral-600 text-center">
+                {errorMessage}
+              </Text>
+            </View>
+            
+            <TouchableOpacity
+              className="bg-primary rounded-lg py-3 px-4 mt-2 items-center"
+              onPress={() => setShowErrorModal(false)}
+            >
+              <Text className="text-white font-semibold text-lg">Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };

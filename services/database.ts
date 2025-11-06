@@ -33,6 +33,7 @@ interface Item {
   low_stock_threshold: number;
   enabled: boolean;
   created_at: string;
+  reserved?: number; // Make optional since it's not in the table schema
 }
 
 interface College {
@@ -203,6 +204,28 @@ export const initDatabase = (): Promise<void> => {
         console.log('Admin user already exists');
       }
 
+      // Insert default items if they don't exist
+      const defaultItems = [
+        { key: 'xs', label: 'Extra Small', image_key: 'xs', price: 299, stock: 0, low_stock_threshold: 5 },
+        { key: 'small', label: 'Small', image_key: 'small', price: 299, stock: 0, low_stock_threshold: 5 },
+        { key: 'medium', label: 'Medium', image_key: 'medium', price: 299, stock: 0, low_stock_threshold: 5 },
+        { key: 'large', label: 'Large', image_key: 'large', price: 299, stock: 0, low_stock_threshold: 5 },
+        { key: 'xl', label: 'Extra Large', image_key: 'xl', price: 299, stock: 0, low_stock_threshold: 5 },
+        { key: 'xxl', label: '2X Large', image_key: 'xxl', price: 299, stock: 0, low_stock_threshold: 5 },
+        { key: 'xxxl', label: '3X Large', image_key: 'xxxl', price: 299, stock: 0, low_stock_threshold: 5 },
+      ];
+
+      defaultItems.forEach(item => {
+        try {
+          db.runSync(
+            `INSERT OR IGNORE INTO items (key, label, image_key, price, stock, low_stock_threshold) VALUES (?, ?, ?, ?, ?, ?)`,
+            [item.key, item.label, item.image_key, item.price, item.stock, item.low_stock_threshold]
+          );
+        } catch (error) {
+          console.log(`Item ${item.key} already exists`);
+        }
+      });
+
       console.log('Database initialized successfully');
       resolve();
     } catch (error) {
@@ -214,7 +237,7 @@ export const initDatabase = (): Promise<void> => {
 
 // User operations
 export const userService = {
-// Login user
+  // Login user
   login: (username: string, password: string): Promise<User> => {
     return new Promise((resolve, reject) => {
       try {
@@ -280,7 +303,7 @@ export const userService = {
             userData.name, 
             userData.password, 
             userData.role || 'cashier',
-            userData.status || 'active' // Use provided status or default to active
+            userData.status || 'active'
           ]
         ) as SQLiteResult;
         
@@ -290,7 +313,7 @@ export const userService = {
           name: userData.name,
           password: userData.password,
           role: userData.role || 'cashier',
-          status: userData.status || 'active', // Make sure this is set
+          status: userData.status || 'active',
           total_stock: 0,
           today_restock: 0,
           total_sold: 0,
@@ -319,30 +342,29 @@ export const userService = {
         const updates: string[] = [];
         const values: any[] = [];
 
-        if (userData.username !== undefined) {
-          updates.push('username = ?');
-          values.push(userData.username);
-        }
-        if (userData.name !== undefined) {
-          updates.push('name = ?');
-          values.push(userData.name);
-        }
-        if (userData.password !== undefined) {
-          updates.push('password = ?');
-          values.push(userData.password);
-        }
-        if (userData.status !== undefined) {
-          updates.push('status = ?');
-          values.push(userData.status);
-        }
+        // Add all fields that need updating
+        const fields: (keyof User)[] = [
+          'username', 'name', 'password', 'status', 'total_stock', 'today_restock',
+          'total_sold', 'today_sold', 'total_revenue', 'today_revenue', 
+          'total_rejected', 'today_rejected', 'last_active'
+        ];
+
+        fields.forEach(field => {
+          if (userData[field] !== undefined) {
+            updates.push(`${field} = ?`);
+            values.push(userData[field]);
+          }
+        });
 
         updates.push('updated_at = datetime("now")');
         values.push(id);
 
-        db.runSync(
-          `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
-          values
-        );
+        if (updates.length > 1) { // More than just updated_at
+          db.runSync(
+            `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
+            values
+          );
+        }
 
         // Get the updated user
         const updatedUser = db.getFirstSync('SELECT * FROM users WHERE id = ?', [id]) as User;
@@ -396,19 +418,27 @@ export const itemService = {
         const updates: string[] = [];
         const values: any[] = [];
 
-        Object.keys(itemData).forEach(key => {
-          if (itemData[key as keyof Item] !== undefined) {
-            updates.push(`${key} = ?`);
-            values.push(itemData[key as keyof Item]);
+        // Add all fields that need updating
+        const fields: (keyof Item)[] = [
+          'key', 'label', 'image_key', 'price', 'stock', 'rejected', 
+          'low_stock_threshold', 'enabled'
+        ];
+
+        fields.forEach(field => {
+          if (itemData[field] !== undefined) {
+            updates.push(`${field} = ?`);
+            values.push(itemData[field]);
           }
         });
 
         values.push(id);
 
-        db.runSync(
-          `UPDATE items SET ${updates.join(', ')} WHERE id = ?`,
-          values
-        );
+        if (updates.length > 0) {
+          db.runSync(
+            `UPDATE items SET ${updates.join(', ')} WHERE id = ?`,
+            values
+          );
+        }
 
         // Get the updated item
         const updatedItem = db.getFirstSync('SELECT * FROM items WHERE id = ?', [id]) as Item;

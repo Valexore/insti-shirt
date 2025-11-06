@@ -1,17 +1,19 @@
-import { Stack } from "expo-router";
+// app/(user)/_layout.tsx
+import { Stack, useLocalSearchParams } from "expo-router";
 import React from "react";
 
-const ShopLayout = () => {
+const UserLayout = () => {
+  const params = useLocalSearchParams();
+  
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      
-
-        <Stack.Screen
+      <Stack.Screen
         name="(tabs)"
         options={{
           title: "tabs",
           headerShown: false,
         }}
+        initialParams={params} // Pass params to tabs
       />
 
       <Stack.Screen
@@ -20,21 +22,19 @@ const ShopLayout = () => {
           title: "Shop",
           headerShown: false,
         }}
+        initialParams={params} // Pass params to shop
       />
       
-        <Stack.Screen
+      <Stack.Screen
         name="(restock)"
         options={{
           title: "Restock",
           headerShown: false,
         }}
+        initialParams={params} // Pass params to restock
       />
-
-
-
-
     </Stack>
   );
 };
 
-export default ShopLayout;
+export default UserLayout;

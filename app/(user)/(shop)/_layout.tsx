@@ -5,7 +5,7 @@ const ShopLayout = () => {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen
-        name="informationt"
+        name="information"
         options={{
           title: "Information",
           headerShown: false,
