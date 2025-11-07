@@ -11,7 +11,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { configService, itemService } from "../../../services/database";
+import { configService } from "../../../services/database";
+import { shopService } from "../../../services/shopService";
 
 // Import images
 const extraSmallImg = require("../../../assets/images/size-shirt/extra-small.png");
@@ -22,21 +23,14 @@ const xlImg = require("../../../assets/images/size-shirt/extra-large.png");
 const xxlImg = require("../../../assets/images/size-shirt/extra-extra-large.png");
 const xxxlImg = require("../../../assets/images/size-shirt/extra-extra-extra-large.png");
 
-type SizeKey = "xs" | "small" | "medium" | "large" | "xl" | "xxl" | "xxxl";
 type TabType = "available" | "rejected" | "returned";
 
 interface Quantities {
-  xs: number;
-  small: number;
-  medium: number;
-  large: number;
-  xl: number;
-  xxl: number;
-  xxxl: number;
+  [key: string]: number; // Dynamic keys based on items
 }
 
 interface SizeItem {
-  key: SizeKey;
+  key: string;
   label: string;
   image: any;
   price: number;
@@ -66,29 +60,18 @@ const Shop = () => {
     returnsEnabled: true
   });
 
-  const [availableStock, setAvailableStock] = useState<Quantities>({
-    xs: 0, small: 0, medium: 0, large: 0, xl: 0, xxl: 0, xxxl: 0
-  });
-  
+  const [availableStock, setAvailableStock] = useState<Quantities>({});
   const [sizes, setSizes] = useState<SizeItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const [quantities, setQuantities] = useState<Quantities>({
-    xs: 0, small: 0, medium: 0, large: 0, xl: 0, xxl: 0, xxxl: 0,
-  });
-
-  const [rejectedQuantities, setRejectedQuantities] = useState<Quantities>({
-    xs: 0, small: 0, medium: 0, large: 0, xl: 0, xxl: 0, xxxl: 0,
-  });
-
-  const [returnedQuantities, setReturnedQuantities] = useState<Quantities>({
-    xs: 0, small: 0, medium: 0, large: 0, xl: 0, xxl: 0, xxxl: 0,
-  });
+  const [quantities, setQuantities] = useState<Quantities>({});
+  const [rejectedQuantities, setRejectedQuantities] = useState<Quantities>({});
+  const [returnedQuantities, setReturnedQuantities] = useState<Quantities>({});
 
   const [isReservation, setIsReservation] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>("available");
 
-  // Parse user data from params - FIXED: Use specific params instead of entire params object
+  // Parse user data from params
   useEffect(() => {
     const parseUserData = () => {
       if (params.user) {
@@ -111,9 +94,9 @@ const Shop = () => {
 
     const userData = parseUserData();
     setCurrentUser(userData);
-  }, [params.user, params.userId, params.userName, params.userUsername, params.userRole]); // Only specific params as dependencies
+  }, [params.user, params.userId, params.userName, params.userUsername, params.userRole]);
 
-  // Load configuration and data - FIXED: Added proper dependencies
+  // Load configuration and data
   useEffect(() => {
     const loadConfigurationAndData = async () => {
       try {
@@ -134,30 +117,34 @@ const Shop = () => {
           return;
         }
 
-        // Load items from database
-        const items = await itemService.getItems();
-        const enabledItems = items.filter((item: any) => item.enabled);
+        // Load items from database using shopService
+        const items = await shopService.getAvailableItems();
         
-        const sizeItems: SizeItem[] = enabledItems.map((item: any) => ({
-          key: item.key as SizeKey,
-          label: item.label,
-          image: getImageForSize(item.key),
-          price: item.price,
-          stock: item.stock
-        }));
+        setSizes(items);
         
-        setSizes(sizeItems);
+        // Set available stock dynamically
+        const stock: Quantities = {};
         
-        // Set available stock
-        const stock: Quantities = {
-          xs: 0, small: 0, medium: 0, large: 0, xl: 0, xxl: 0, xxxl: 0
-        };
-        
-        enabledItems.forEach((item: any) => {
-          stock[item.key as SizeKey] = item.stock;
+        items.forEach((item: SizeItem) => {
+          stock[item.key] = item.stock;
         });
         
         setAvailableStock(stock);
+        
+        // Initialize quantities
+        const initialQuantities: Quantities = {};
+        const initialRejected: Quantities = {};
+        const initialReturned: Quantities = {};
+        
+        items.forEach((item: SizeItem) => {
+          initialQuantities[item.key] = 0;
+          initialRejected[item.key] = 0;
+          initialReturned[item.key] = 0;
+        });
+        
+        setQuantities(initialQuantities);
+        setRejectedQuantities(initialRejected);
+        setReturnedQuantities(initialReturned);
         
       } catch (error) {
         console.error('Error loading shop data:', error);
@@ -168,7 +155,7 @@ const Shop = () => {
     };
 
     loadConfigurationAndData();
-  }, []); // Empty dependency array - only run once
+  }, []);
 
   const getCurrentQuantities = () => {
     switch (activeTab) {
@@ -197,7 +184,7 @@ const Shop = () => {
     }
   };
 
-  const updateQuantity = (size: SizeKey, change: number) => {
+  const updateQuantity = (size: string, change: number) => {
     const currentQuantities = getCurrentQuantities();
     const currentStock = availableStock[size] || 0;
 
@@ -217,7 +204,7 @@ const Shop = () => {
     });
   };
 
-  const handleInputChange = (size: SizeKey, text: string) => {
+  const handleInputChange = (size: string, text: string) => {
     if (!configuration.allowDirectQuantityInput) {
       Alert.alert(
         "Direct Input Disabled",
@@ -343,16 +330,16 @@ const Shop = () => {
     return Object.values(currentQuantities).reduce((sum, qty) => sum + qty, 0);
   };
 
-  const getStockDisplayText = (size: SizeKey) => {
+  const getStockDisplayText = (size: string) => {
     const stock = availableStock[size] || 0;
 
     if (!configuration.showStockLevels) {
       switch (activeTab) {
         case "rejected":
-          const rejectedQty = rejectedQuantities[size];
+          const rejectedQty = rejectedQuantities[size] || 0;
           return `Rejecting: ${rejectedQty}`;
         case "returned":
-          const returnedQty = returnedQuantities[size];
+          const returnedQty = returnedQuantities[size] || 0;
           return `Returning: ${returnedQty}`;
         case "available":
         default:
@@ -363,10 +350,10 @@ const Shop = () => {
 
     switch (activeTab) {
       case "rejected":
-        const rejectedQty = rejectedQuantities[size];
+        const rejectedQty = rejectedQuantities[size] || 0;
         return `Available: ${stock} • Rejecting: ${rejectedQty}`;
       case "returned":
-        const returnedQty = returnedQuantities[size];
+        const returnedQty = returnedQuantities[size] || 0;
         return `Available: ${stock} • Returning: ${returnedQty}`;
       case "available":
       default:
@@ -376,7 +363,7 @@ const Shop = () => {
     }
   };
 
-  const getStockTextColor = (size: SizeKey) => {
+  const getStockTextColor = (size: string) => {
     const stock = availableStock[size] || 0;
 
     switch (activeTab) {
@@ -390,20 +377,6 @@ const Shop = () => {
         if (stock < 5 && configuration.lowStockWarnings) return "text-warning";
         return "text-success";
     }
-  };
-
-  const getImageForSize = (sizeKey: string) => {
-    const imageMap: Record<string, any> = {
-      'xs': extraSmallImg,
-      'small': smallImg,
-      'medium': mediumImg,
-      'large': largeImg,
-      'xl': xlImg,
-      'xxl': xxlImg,
-      'xxxl': xxxlImg,
-    };
-    
-    return imageMap[sizeKey] || mediumImg;
   };
 
   // Add empty state handling

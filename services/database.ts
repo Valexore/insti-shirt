@@ -204,27 +204,39 @@ export const initDatabase = (): Promise<void> => {
         console.log('Admin user already exists');
       }
 
-      // Insert default items if they don't exist
-      const defaultItems = [
-        { key: 'xs', label: 'Extra Small', image_key: 'xs', price: 299, stock: 0, low_stock_threshold: 5 },
-        { key: 'small', label: 'Small', image_key: 'small', price: 299, stock: 0, low_stock_threshold: 5 },
-        { key: 'medium', label: 'Medium', image_key: 'medium', price: 299, stock: 0, low_stock_threshold: 5 },
-        { key: 'large', label: 'Large', image_key: 'large', price: 299, stock: 0, low_stock_threshold: 5 },
-        { key: 'xl', label: 'Extra Large', image_key: 'xl', price: 299, stock: 0, low_stock_threshold: 5 },
-        { key: 'xxl', label: '2X Large', image_key: 'xxl', price: 299, stock: 0, low_stock_threshold: 5 },
-        { key: 'xxxl', label: '3X Large', image_key: 'xxxl', price: 299, stock: 0, low_stock_threshold: 5 },
-      ];
+      // Check if items table is empty before inserting default items
+      try {
+        const existingItems = db.getAllSync('SELECT * FROM items') as Item[];
+        
+        // Only insert default items if the table is completely empty
+        if (existingItems.length === 0) {
+          const defaultItems = [
+            { key: 'xs', label: 'Extra Small', image_key: 'xs', price: 299, stock: 0, low_stock_threshold: 5 },
+            { key: 'small', label: 'Small', image_key: 'small', price: 299, stock: 0, low_stock_threshold: 5 },
+            { key: 'medium', label: 'Medium', image_key: 'medium', price: 299, stock: 0, low_stock_threshold: 5 },
+            { key: 'large', label: 'Large', image_key: 'large', price: 299, stock: 0, low_stock_threshold: 5 },
+            { key: 'xl', label: 'Extra Large', image_key: 'xl', price: 299, stock: 0, low_stock_threshold: 5 },
+            { key: 'xxl', label: '2X Large', image_key: 'xxl', price: 299, stock: 0, low_stock_threshold: 5 },
+            { key: 'xxxl', label: '3X Large', image_key: 'xxxl', price: 299, stock: 0, low_stock_threshold: 5 },
+          ];
 
-      defaultItems.forEach(item => {
-        try {
-          db.runSync(
-            `INSERT OR IGNORE INTO items (key, label, image_key, price, stock, low_stock_threshold) VALUES (?, ?, ?, ?, ?, ?)`,
-            [item.key, item.label, item.image_key, item.price, item.stock, item.low_stock_threshold]
-          );
-        } catch (error) {
-          console.log(`Item ${item.key} already exists`);
+          defaultItems.forEach(item => {
+            try {
+              db.runSync(
+                `INSERT INTO items (key, label, image_key, price, stock, low_stock_threshold) VALUES (?, ?, ?, ?, ?, ?)`,
+                [item.key, item.label, item.image_key, item.price, item.stock, item.low_stock_threshold]
+              );
+            } catch (error) {
+              console.log(`Item ${item.key} already exists`);
+            }
+          });
+          console.log('Default items inserted for first-time setup');
+        } else {
+          console.log('Items table already has data, skipping default items insertion');
         }
-      });
+      } catch (error) {
+        console.error('Error checking/inserting default items:', error);
+      }
 
       console.log('Database initialized successfully');
       resolve();
@@ -804,7 +816,7 @@ export const reportService = {
   }
 };
 
-// Database resetter
+// Database resetter - UPDATED: Now also resets configuration tables
 export const resetDatabase = async (): Promise<void> => {
   return new Promise((resolve, reject) => {
     try {
@@ -821,9 +833,30 @@ export const resetDatabase = async (): Promise<void> => {
       db.execSync('DROP TABLE IF EXISTS monitoring_settings;');
       
       console.log('All tables dropped successfully');
-      resolve();
+      
+      // Reinitialize the database
+      initDatabase().then(() => {
+        console.log('Database reinitialized after reset');
+        resolve();
+      }).catch(error => {
+        reject(error);
+      });
     } catch (error) {
       console.error('Error resetting database:', error);
+      reject(error);
+    }
+  });
+};
+
+// NEW: Function to clear only items (for development/testing)
+export const clearAllItems = async (): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    try {
+      db.runSync('DELETE FROM items;');
+      console.log('All items cleared from database');
+      resolve();
+    } catch (error) {
+      console.error('Error clearing items:', error);
       reject(error);
     }
   });

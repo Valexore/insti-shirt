@@ -331,6 +331,7 @@ const Configuration = () => {
     const imageItem = availableImages.find(img => img.key === key);
     return imageItem ? imageItem.image : availableImages[0].image;
   };
+
   useEffect(() => {
     loadData();
   }, []);
@@ -363,63 +364,64 @@ const Configuration = () => {
     }));
   };
 
-const toggleItemStatus = async (itemKey: string) => {
-  try {
-    // First get the current item data from database
-    const itemsData = await itemService.getItems();
-    const dbItem = itemsData.find((dbItem: any) => dbItem.key === itemKey);
-    
-    if (dbItem) {
-      // Calculate the new enabled status
-      const newEnabledStatus = !dbItem.enabled;
+  const toggleItemStatus = async (itemKey: string) => {
+    try {
+      // First get the current item data from database
+      const itemsData = await itemService.getItems();
+      const dbItem = itemsData.find((dbItem: any) => dbItem.key === itemKey);
       
-      // Update in database first
-      await itemService.updateItem(dbItem.id, { 
-        enabled: newEnabledStatus 
-      });
+      if (dbItem) {
+        // Calculate the new enabled status
+        const newEnabledStatus = !dbItem.enabled;
+        
+        // Update in database first
+        await itemService.updateItem(dbItem.id, { 
+          enabled: newEnabledStatus 
+        });
+        
+        // Then update local state
+        setItems(prevItems => 
+          prevItems.map(item => 
+            item.key === itemKey ? { ...item, enabled: newEnabledStatus } : item
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error updating item status:', error);
+      Alert.alert('Error', 'Failed to update item status');
       
-      // Then update local state
-      setItems(prevItems => 
-        prevItems.map(item => 
-          item.key === itemKey ? { ...item, enabled: newEnabledStatus } : item
+      // Reload data to sync with database in case of error
+      await loadData(); 
+    }
+  };
+
+  const toggleCollegeStatus = async (collegeId: string) => {
+    try {
+      // Optimistically update the UI first
+      setColleges(prevColleges => 
+        prevColleges.map(college => 
+          college.id === collegeId ? { ...college, enabled: !college.enabled } : college
         )
       );
+
+      // Then update in database
+      await collegeService.updateCollege(collegeId, { 
+        enabled: !colleges.find(c => c.id === collegeId)?.enabled 
+      });
+      
+    } catch (error) {
+      console.error('Error updating college status:', error);
+      Alert.alert('Error', 'Failed to update college status');
+      
+      await loadData();
     }
-  } catch (error) {
-    console.error('Error updating item status:', error);
-    Alert.alert('Error', 'Failed to update item status');
-    
-    // Reload data to sync with database in case of error
-    await loadData(); 
-  }
-};
+  };
 
-const toggleCollegeStatus = async (collegeId: string) => {
-  try {
-    // Optimistically update the UI first
-    setColleges(prevColleges => 
-      prevColleges.map(college => 
-        college.id === collegeId ? { ...college, enabled: !college.enabled } : college
-      )
-    );
-
-    // Then update in database
-    await collegeService.updateCollege(collegeId, { 
-      enabled: !colleges.find(c => c.id === collegeId)?.enabled 
-    });
-    
-  } catch (error) {
-    console.error('Error updating college status:', error);
-    Alert.alert('Error', 'Failed to update college status');
-    
-    await loadData();
-  }
-};
-
+  // FIXED: Proper item deletion function
   const deleteItem = async (itemKey: string) => {
     Alert.alert(
       'Delete Item',
-      'Are you sure you want to delete this item? This action cannot be undone.',
+      'Are you sure you want to permanently delete this item? This action cannot be undone and will remove all associated data.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -432,13 +434,24 @@ const toggleCollegeStatus = async (collegeId: string) => {
               const dbItem = itemsData.find((dbItem: any) => dbItem.key === itemKey);
               
               if (dbItem) {
+                // Delete from database
                 await itemService.deleteItem(dbItem.id);
-                await loadData(); // Reload items
+                
+                // Update local state immediately
+                setItems(prevItems => prevItems.filter(item => item.key !== itemKey));
+                
                 Alert.alert('Success', 'Item deleted successfully');
+              } else {
+                Alert.alert('Error', 'Item not found in database');
+                // Reload data to sync
+                await loadData();
               }
             } catch (error) {
               console.error('Error deleting item:', error);
-              Alert.alert('Error', 'Failed to delete item');
+              Alert.alert('Error', 'Failed to delete item. Please try again.');
+              
+              // Reload data to sync with database in case of error
+              await loadData();
             }
           }
         }
@@ -458,11 +471,14 @@ const toggleCollegeStatus = async (collegeId: string) => {
           onPress: async () => {
             try {
               await collegeService.deleteCollege(collegeId);
-              await loadData(); // Reload colleges
+              // Update local state immediately
+              setColleges(prevColleges => prevColleges.filter(college => college.id !== collegeId));
               Alert.alert('Success', 'College deleted successfully');
             } catch (error) {
               console.error('Error deleting college:', error);
               Alert.alert('Error', 'Failed to delete college');
+              // Reload data to sync
+              await loadData();
             }
           }
         }
@@ -510,7 +526,8 @@ const toggleCollegeStatus = async (collegeId: string) => {
         enabled: true
       });
       
-      await loadData(); // Reload items
+      // Reload items to get the updated list
+      await loadData();
       Alert.alert('Success', 'Item added successfully');
     } catch (error) {
       console.error('Error adding item:', error);
@@ -544,7 +561,8 @@ const toggleCollegeStatus = async (collegeId: string) => {
         enabled: true
       });
       
-      await loadData(); // Reload colleges
+      // Reload colleges to get the updated list
+      await loadData();
       Alert.alert('Success', 'College added successfully');
     } catch (error) {
       console.error('Error adding college:', error);
@@ -587,7 +605,7 @@ const toggleCollegeStatus = async (collegeId: string) => {
   const handleResetToDefaults = async () => {
     Alert.alert(
       'Reset Configuration',
-      'Are you sure you want to reset all settings to default values?',
+      'Are you sure you want to reset all settings to default values? This will not delete your items and colleges.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -886,7 +904,6 @@ const toggleCollegeStatus = async (collegeId: string) => {
 // ===== TAB COMPONENTS =====
 const SettingsTab = ({ features, toggleFeature, sessionTimeout, setSessionTimeout, loginAttempts, setLoginAttempts, FeatureToggle, NumberInput }: any) => (
   <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-
     {/* Shop Configuration */}
     <View className="mx-4 mt-6 bg-white rounded-xl shadow-sm border border-accent-100">
       <View className="p-4 border-b border-accent-100">

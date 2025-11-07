@@ -22,10 +22,8 @@ const xlImg = require("../../../assets/images/size-shirt/extra-large.png");
 const xxlImg = require("../../../assets/images/size-shirt/extra-extra-large.png");
 const xxxlImg = require("../../../assets/images/size-shirt/extra-extra-extra-large.png");
 
-type SizeKey = "xs" | "small" | "medium" | "large" | "xl" | "xxl" | "xxxl";
-
 interface StockItem {
-  key: SizeKey;
+  key: string; // Dynamic key
   label: string;
   image: number;
   currentStock: number;
@@ -45,7 +43,7 @@ const RestockConfig = () => {
   const [currentUser, setCurrentUser] = useState<UserData | null>(null);
   const [stockData, setStockData] = useState<StockItem[]>([]);
   const [customAmount, setCustomAmount] = useState("");
-  const [editingItem, setEditingItem] = useState<SizeKey | null>(null);
+  const [editingItem, setEditingItem] = useState<string | null>(null);
   const [tempAmount, setTempAmount] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
@@ -71,8 +69,8 @@ const RestockConfig = () => {
       setIsLoading(true);
       const data = await restockService.getCurrentStock();
       
-      const initialData: StockItem[] = data.map((item: { key: string; label: any; image: any; stock: any; }) => ({
-        key: item.key as SizeKey,
+      const initialData: StockItem[] = data.map((item: any) => ({
+        key: item.key,
         label: item.label,
         image: item.image,
         currentStock: item.stock,
@@ -96,7 +94,7 @@ const RestockConfig = () => {
     router.back();
   }, [router]);
 
-  const updateRestockAmount = useCallback((key: SizeKey, amount: number) => {
+  const updateRestockAmount = useCallback((key: string, amount: number) => {
     setStockData(prevData =>
       prevData.map(item =>
         item.key === key
@@ -106,12 +104,12 @@ const RestockConfig = () => {
     );
   }, []);
 
-  const handleDirectInput = useCallback((key: SizeKey, text: string) => {
+  const handleDirectInput = useCallback((key: string, text: string) => {
     const numericValue = text.replace(/[^0-9]/g, '');
     setTempAmount(numericValue);
   }, []);
 
-  const saveDirectInput = useCallback((key: SizeKey) => {
+  const saveDirectInput = useCallback((key: string) => {
     if (tempAmount === "") {
       setEditingItem(null);
       return;
@@ -125,7 +123,7 @@ const RestockConfig = () => {
     setTempAmount("");
   }, [tempAmount, updateRestockAmount]);
 
-  const startEditing = useCallback((key: SizeKey, currentAmount: number) => {
+  const startEditing = useCallback((key: string, currentAmount: number) => {
     setEditingItem(key);
     setTempAmount(currentAmount.toString());
   }, []);

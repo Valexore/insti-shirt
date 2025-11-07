@@ -30,7 +30,7 @@ export const shopService = {
         .map(item => ({
           key: item.key,
           label: item.label,
-          image: getImageForSize(item.key),
+          image: getImageByKey(item.image_key),
           price: item.price,
           stock: item.stock
         }));
@@ -200,8 +200,8 @@ export const shopService = {
   }
 };
 
-// Helper function to map size keys to images
-const getImageForSize = (sizeKey: string) => {
+// Helper function to map image keys to images
+const getImageByKey = (imageKey: string) => {
   const imageMap: Record<string, any> = {
     'xs': require('../assets/images/size-shirt/extra-small.png'),
     'small': require('../assets/images/size-shirt/small.png'),
@@ -212,5 +212,5 @@ const getImageForSize = (sizeKey: string) => {
     'xxxl': require('../assets/images/size-shirt/extra-extra-extra-large.png'),
   };
   
-  return imageMap[sizeKey] || require('../assets/images/size-shirt/medium.png');
+  return imageMap[imageKey] || require('../assets/images/size-shirt/medium.png');
 };
