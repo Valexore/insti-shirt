@@ -1,8 +1,9 @@
-// confirmation.tsx
+// app/(shop)/confirmation.tsx
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { shopService } from '../../../services/shopService';
 
 // Define the type for quantities
 type Quantities = {
@@ -27,6 +28,8 @@ const Confirmation = () => {
     orNumber: string;
     college: { name: string };
   } : null;
+
+  const userData = params.user ? JSON.parse(params.user as string) : null;
 
   if (!orderData) {
     return (
@@ -64,16 +67,51 @@ const Confirmation = () => {
     xxxl: 'XXXL'
   };
 
-  const handleConfirmOrder = () => {
-    // Here you would typically send the order to your backend
-    console.log('Order confirmed:', orderData);
-    
-    // Navigate to success screen or home
-    router.replace('../(tabs)');
+  const handleConfirmOrder = async () => {
+    try {
+      if (!userData) {
+        Alert.alert('Error', 'User data not found');
+        return;
+      }
+
+      // Process the sale using shopService
+      const saleData = {
+        quantities: quantities,
+        customerInfo: {
+          fullName,
+          studentId,
+          orNumber,
+          college: college?.name
+        },
+        userId: userData.id,
+        totalAmount: totalAmount
+      };
+
+      const result = await shopService.processSale(saleData);
+      
+      Alert.alert(
+        'Order Confirmed!',
+        `Successfully processed order for ${totalItems} item${totalItems !== 1 ? 's' : ''}. Total: ₱${totalAmount.toLocaleString()}`,
+        [
+          {
+            text: 'OK',
+            onPress: () => router.replace('/(user)/(tabs)')
+          }
+        ]
+      );
+      
+    } catch (error) {
+      console.error('Error confirming order:', error);
+      Alert.alert('Error', 'Failed to process order. Please try again.');
+    }
   };
 
   const handleEditOrder = () => {
     router.back();
+  };
+
+  const handleCancel = () => {
+    router.replace('/(user)/(tabs)');
   };
 
   return (
@@ -193,7 +231,7 @@ const Confirmation = () => {
           </TouchableOpacity>
           
           <TouchableOpacity 
-            onPress={() => router.replace('../(tabs)/analytics')}
+            onPress={handleConfirmOrder}
             className="flex-1 bg-success rounded-xl py-4 items-center shadow-sm"
           >
             <Text className="text-white text-lg font-semibold">Confirm Order</Text>
@@ -202,7 +240,7 @@ const Confirmation = () => {
         
         {/* Cancel button with proper spacing */}
         <TouchableOpacity 
-          onPress={() => router.replace('../(tabs)/analytics')}
+          onPress={handleCancel}
           className="py-4 items-center border border-neutral-300 rounded-xl"
         >
           <Text className="text-neutral-500 text-lg font-semibold">Cancel Order</Text>

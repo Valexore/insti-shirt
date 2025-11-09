@@ -67,6 +67,18 @@ interface Report {
   created_at: string;
 }
 
+interface Activity {
+  id: number;
+  user_id: number;
+  type: 'sale' | 'restock' | 'login' | 'rejected' | 'returned';
+  description: string;
+  amount?: number;
+  items?: string;
+  timestamp: string;
+  created_at: string;
+  user_name?: string; // Joined field from users table
+}
+
 // Type for SQLite result
 interface SQLiteResult {
   lastInsertRowId: number;
@@ -160,6 +172,21 @@ export const initDatabase = (): Promise<void> => {
         );
       `);
 
+      // NEW: Activities table
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS activities (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          type TEXT NOT NULL,
+          description TEXT NOT NULL,
+          amount INTEGER DEFAULT 0,
+          items TEXT,
+          timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users (id)
+        );
+      `);
+
       // NEW TABLES FOR ADDITIONAL SETTINGS
       // Reservation settings table
       db.execSync(`
@@ -202,6 +229,16 @@ export const initDatabase = (): Promise<void> => {
         );
       } catch (error) {
         console.log('Admin user already exists');
+      }
+
+      // Insert default cashier user
+      try {
+        db.runSync(
+          `INSERT OR IGNORE INTO users (username, name, password, role) VALUES (?, ?, ?, ?)`,
+          ['cashier', 'Cashier User', '123', 'cashier']
+        );
+      } catch (error) {
+        console.log('Cashier user already exists');
       }
 
       // Check if items table is empty before inserting default items
@@ -816,6 +853,158 @@ export const reportService = {
   }
 };
 
+// NEW: Activity operations
+export const activityService = {
+  // Create new activity
+  createActivity: (activityData: Omit<Activity, 'id' | 'created_at' | 'user_name'>): Promise<Activity> => {
+    return new Promise((resolve, reject) => {
+      try {
+        const result = db.runSync(
+          `INSERT INTO activities (user_id, type, description, amount, items, timestamp) 
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            activityData.user_id,
+            activityData.type,
+            activityData.description,
+            activityData.amount || 0,
+            activityData.items ? JSON.stringify(activityData.items) : null,
+            activityData.timestamp || new Date().toISOString()
+          ]
+        ) as SQLiteResult;
+
+        const newActivity: Activity = {
+          id: result.lastInsertRowId,
+          user_id: activityData.user_id,
+          type: activityData.type,
+          description: activityData.description,
+          amount: activityData.amount || 0,
+          items: activityData.items,
+          timestamp: activityData.timestamp || new Date().toISOString(),
+          created_at: new Date().toISOString()
+        };
+
+        resolve(newActivity);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  },
+
+  // Get activities for a specific user
+getUserActivities: (userId: number, limit?: number): Promise<Activity[]> => {
+  return new Promise((resolve, reject) => {
+    try {
+      const query = limit 
+        ? `SELECT a.*, u.name as user_name FROM activities a 
+           LEFT JOIN users u ON a.user_id = u.id 
+           WHERE a.user_id = ? 
+           ORDER BY a.timestamp DESC 
+           LIMIT ?`
+        : `SELECT a.*, u.name as user_name FROM activities a 
+           LEFT JOIN users u ON a.user_id = u.id 
+           WHERE a.user_id = ? 
+           ORDER BY a.timestamp DESC`;
+      
+      const params = limit ? [userId, limit] : [userId];
+      const activities = db.getAllSync(query, params) as Activity[];
+      
+      // Parse items JSON if exists
+      const parsedActivities = activities.map(activity => ({
+        ...activity,
+        items: activity.items ? JSON.parse(activity.items) : undefined
+      }));
+      
+      resolve(parsedActivities);
+    } catch (error) {
+      reject(error);
+    }
+  });
+},
+
+  // Get all activities (for admin view)
+  getAllActivities: (limit?: number): Promise<Activity[]> => {
+    return new Promise((resolve, reject) => {
+      try {
+        const query = limit 
+          ? `SELECT a.*, u.name as user_name FROM activities a 
+             LEFT JOIN users u ON a.user_id = u.id 
+             ORDER BY a.timestamp DESC 
+             LIMIT ?`
+          : `SELECT a.*, u.name as user_name FROM activities a 
+             LEFT JOIN users u ON a.user_id = u.id 
+             ORDER BY a.timestamp DESC`;
+        
+        const params = limit ? [limit] : [];
+        const activities = db.getAllSync(query, params) as Activity[];
+        
+        // Parse items JSON if exists
+        const parsedActivities = activities.map(activity => ({
+          ...activity,
+          items: activity.items ? JSON.parse(activity.items) : undefined
+        }));
+        
+        resolve(parsedActivities);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  },
+
+  // Get recent activities (last 24 hours)
+  getRecentActivities: (userId?: number): Promise<Activity[]> => {
+    return new Promise((resolve, reject) => {
+      try {
+        const query = userId 
+          ? `SELECT a.*, u.name as user_name FROM activities a 
+             LEFT JOIN users u ON a.user_id = u.id 
+             WHERE a.user_id = ? AND a.timestamp >= datetime('now', '-1 day')
+             ORDER BY a.timestamp DESC`
+          : `SELECT a.*, u.name as user_name FROM activities a 
+             LEFT JOIN users u ON a.user_id = u.id 
+             WHERE a.timestamp >= datetime('now', '-1 day')
+             ORDER BY a.timestamp DESC`;
+        
+        const params = userId ? [userId] : [];
+        const activities = db.getAllSync(query, params) as Activity[];
+        
+        // Parse items JSON if exists
+        const parsedActivities = activities.map(activity => ({
+          ...activity,
+          items: activity.items ? JSON.parse(activity.items) : undefined
+        }));
+        
+        resolve(parsedActivities);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  },
+
+  // Delete activities for a user
+  deleteUserActivities: (userId: number): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      try {
+        db.runSync('DELETE FROM activities WHERE user_id = ?', [userId]);
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  },
+
+  // Delete all activities
+  deleteAllActivities: (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      try {
+        db.runSync('DELETE FROM activities');
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+};
+
 // Database resetter - UPDATED: Now also resets configuration tables
 export const resetDatabase = async (): Promise<void> => {
   return new Promise((resolve, reject) => {
@@ -828,6 +1017,7 @@ export const resetDatabase = async (): Promise<void> => {
       db.execSync('DROP TABLE IF EXISTS colleges;');
       db.execSync('DROP TABLE IF EXISTS configuration;');
       db.execSync('DROP TABLE IF EXISTS reports;');
+      db.execSync('DROP TABLE IF EXISTS activities;');
       db.execSync('DROP TABLE IF EXISTS reservation_settings;');
       db.execSync('DROP TABLE IF EXISTS return_settings;');
       db.execSync('DROP TABLE IF EXISTS monitoring_settings;');

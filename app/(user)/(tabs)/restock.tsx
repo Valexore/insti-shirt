@@ -38,6 +38,23 @@ const Restock = () => {
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
   const [showItemModal, setShowItemModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRestockEnabled, setIsRestockEnabled] = useState(true);
+
+
+    useEffect(() => {
+    const checkRestockStatus = async () => {
+      try {
+        const enabled = await restockService.isRestockEnabled();
+        setIsRestockEnabled(enabled);
+      } catch (error) {
+        console.error('Error checking restock status:', error);
+        setIsRestockEnabled(true); // Default to enabled on error
+      }
+    };
+
+    checkRestockStatus();
+  }, []);
+
 
   // Parse user data
   useEffect(() => {
@@ -135,6 +152,51 @@ const Restock = () => {
   const formatNumber = (num: number) => {
     return num.toLocaleString();
   };
+
+
+  const DisabledRestockState = () => (
+    <View className="flex-1 justify-center items-center px-8">
+      <View className="bg-warning/10 rounded-full p-6 mb-4">
+        <Package size={48} color="#F59E0B" />
+      </View>
+      <Text className="text-warning text-xl font-bold text-center mb-2">
+        Restock Module Disabled
+      </Text>
+      <Text className="text-neutral-500 text-center mb-4">
+        The restock functionality is currently disabled by the administrator.
+      </Text>
+      <Text className="text-neutral-500 text-center mb-6">
+        Please contact your administrator to enable restocking.
+      </Text>
+      <TouchableOpacity 
+        className="bg-primary rounded-lg py-3 px-6"
+        onPress={handleBackToDashboard}
+      >
+        <Text className="text-white font-semibold text-lg">Back to Dashboard</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // Show disabled state if restock is not enabled
+  if (!isRestockEnabled) {
+    return (
+      <View className="flex-1 bg-neutral-50">
+        {/* Header */}
+        <View className="bg-primary p-4">
+          <Text className="text-white text-xl font-bold text-center">
+            Stock Management
+          </Text>
+          {currentUser && (
+            <Text className="text-accent-100 text-sm text-center mt-1">
+              Welcome, {currentUser.name}
+            </Text>
+          )}
+        </View>
+        
+        <DisabledRestockState />
+      </View>
+    );
+  }
 
   // Empty state component
   const EmptyStockState = () => (

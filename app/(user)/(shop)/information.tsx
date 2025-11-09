@@ -1,6 +1,8 @@
+// app/(shop)/information.tsx
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -8,9 +10,10 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { shopService } from '../../../services/shopService';
 
 // Components
-import Button, { BackButton } from '../../components/Button';
+import { BackButton } from '../../components/Button';
 import CollegeOption from '../../components/CollegeOption';
 import InputField from '../../components/InputField';
 import Modal from '../../components/Modal';
@@ -31,15 +34,6 @@ type CollegeOption = {
   name: string;
   image: any;
 };
-
-// Sample college data - replace with your actual images
-const collegeOptions: CollegeOption[] = [
-  { id: 'coe', name: 'College of Engineering', image: require('../../../assets/images/size-shirt/extra-extra-extra-large.png') },
-  { id: 'cas', name: 'College of Arts and Sciences', image: require('../../../assets/images/size-shirt/extra-extra-extra-large.png') },
-  { id: 'cob', name: 'College of Business', image: require('../../../assets/images/size-shirt/extra-extra-extra-large.png') },
-  { id: 'ccje', name: 'College of Criminal Justice Education', image: require('../../../assets/images/size-shirt/extra-extra-extra-large.png') },
-  { id: 'cte', name: 'College of Teacher Education', image: require('../../../assets/images/size-shirt/extra-extra-extra-large.png') },
-];
 
 const Information = () => {
   const router = useRouter();
@@ -65,6 +59,36 @@ const Information = () => {
   const [showCollegeModal, setShowCollegeModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Get colleges from service
+  const [collegeOptions, setCollegeOptions] = useState<CollegeOption[]>([]);
+
+React.useEffect(() => {
+  const loadColleges = async () => {
+    try {
+      const colleges = await shopService.getAvailableColleges();
+      // Map colleges to the expected format without requiring images
+      const formattedColleges = colleges.map(college => ({
+        id: college.id,
+        name: college.name,
+        image: null // No image required
+      }));
+      setCollegeOptions(formattedColleges);
+    } catch (error) {
+      console.error('Error loading colleges:', error);
+      // Fallback colleges without images
+      setCollegeOptions([
+        { id: 'coe', name: 'College of Engineering', image: null },
+        { id: 'cas', name: 'College of Arts and Sciences', image: null },
+        { id: 'cob', name: 'College of Business', image: null },
+        { id: 'ccje', name: 'College of Criminal Justice Education', image: null },
+        { id: 'cte', name: 'College of Teacher Education', image: null },
+      ]);
+    }
+  };
+
+  loadColleges();
+}, []);
+
   const handleSubmit = async () => {
     if (!isFormValid) return;
     
@@ -80,18 +104,20 @@ const Information = () => {
         college: selectedCollege
       };
       
-      console.log(orderData);
+      console.log('Order data:', orderData);
       
       // Navigate to confirmation page with the order data
       router.push({
         pathname: '/confirmation',
         params: {
-          orderData: JSON.stringify(orderData)
+          orderData: JSON.stringify(orderData),
+          user: params.user // Pass user data along
         }
       });
       
     } catch (error) {
       console.error('Submission error:', error);
+      Alert.alert('Error', 'Failed to process order. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -163,12 +189,17 @@ const Information = () => {
           </View>
 
           {/* Submit Button */}
-          <Button
-            onPress={handleSubmit}
-            containerClassName={`w-full ${!isFormValid ? 'bg-gray-400' : ''}`}
+          <TouchableOpacity
+            onPress={isFormValid && !isSubmitting ? handleSubmit : undefined}
+            className={`w-full rounded-xl py-4 items-center ${
+              !isFormValid || isSubmitting ? 'bg-neutral-400' : 'bg-primary'
+            }`}
+            disabled={!isFormValid || isSubmitting}
           >
-            {isSubmitting ? 'Submitting...' : 'Submit Order'}
-          </Button>
+            <Text className="text-white text-lg font-semibold">
+              {isSubmitting ? 'Submitting...' : 'Submit Order'}
+            </Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
 

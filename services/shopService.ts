@@ -1,5 +1,5 @@
 // services/shopService.ts
-import { collegeService, itemService, userService } from './database';
+import { activityService, collegeService, itemService, userService } from './database';
 
 // Define proper types
 interface SaleData {
@@ -50,7 +50,7 @@ export const shopService = {
         .map(college => ({
           id: college.id,
           name: college.name,
-          image: require('../assets/images/college-default.png') // Fixed path
+          image: require('../assets/images/logo-app.png') // Fixed path
         }));
     } catch (error) {
       console.error('Error getting colleges:', error);
@@ -82,6 +82,7 @@ export const shopService = {
     try {
       const { quantities, customerInfo, userId, totalAmount } = saleData;
       const totalItems = Object.values(quantities).reduce((sum, qty) => sum + qty, 0);
+      const soldItems: string[] = [];
 
       // Update stock for each item
       for (const [size, quantity] of Object.entries(quantities)) {
@@ -92,6 +93,7 @@ export const shopService = {
             await itemService.updateItem(item.id, {
               stock: newStock
             });
+            soldItems.push(`${size}: ${quantity}`);
           }
         }
       }
@@ -106,6 +108,16 @@ export const shopService = {
           total_revenue: (user.total_revenue || 0) + totalAmount,
           last_active: new Date().toISOString()
         });
+
+        // Log sale activity
+        await activityService.createActivity({
+          user_id: userId,
+          type: 'sale',
+          description: 'Completed sale transaction',
+          amount: totalAmount,
+          items: soldItems.join(', '),
+          timestamp: new Date().toISOString()
+        });
       }
       
       return { success: true, message: 'Sale processed successfully' };
@@ -119,6 +131,7 @@ export const shopService = {
   processRejected: async (rejectedData: RejectedData) => {
     try {
       const { quantities, userId } = rejectedData;
+      const rejectedItems: string[] = [];
 
       // Update rejected count and stock for each item
       for (const [size, quantity] of Object.entries(quantities)) {
@@ -132,6 +145,7 @@ export const shopService = {
               stock: newStock,
               rejected: newRejected
             });
+            rejectedItems.push(`${size}: ${quantity}`);
           }
         }
       }
@@ -144,6 +158,15 @@ export const shopService = {
           today_rejected: (user.today_rejected || 0) + totalRejected,
           total_rejected: (user.total_rejected || 0) + totalRejected,
           last_active: new Date().toISOString()
+        });
+
+        // Log rejected activity
+        await activityService.createActivity({
+          user_id: userId,
+          type: 'rejected',
+          description: 'Processed rejected items',
+          items: rejectedItems.join(', '),
+          timestamp: new Date().toISOString()
         });
       }
       
@@ -158,6 +181,7 @@ export const shopService = {
   processReturned: async (returnedData: ReturnedData) => {
     try {
       const { quantities, userId } = returnedData;
+      const returnedItems: string[] = [];
 
       // Update stock for returned items
       for (const [size, quantity] of Object.entries(quantities)) {
@@ -168,6 +192,7 @@ export const shopService = {
             await itemService.updateItem(item.id, {
               stock: newStock
             });
+            returnedItems.push(`${size}: +${quantity}`);
           }
         }
       }
@@ -177,6 +202,15 @@ export const shopService = {
       if (user) {
         await userService.updateUser(userId, {
           last_active: new Date().toISOString()
+        });
+
+        // Log returned activity
+        await activityService.createActivity({
+          user_id: userId,
+          type: 'returned',
+          description: 'Processed returned items',
+          items: returnedItems.join(', '),
+          timestamp: new Date().toISOString()
         });
       }
       

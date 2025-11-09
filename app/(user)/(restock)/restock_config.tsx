@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
+import { configService } from "../../../services/database";
 import { restockService } from "../../../services/restockService";
 
 // Image imports
@@ -37,6 +38,13 @@ interface UserData {
   role: string;
 }
 
+interface RestockFeatures {
+  restockEnabled: boolean;
+  quickRestockButtons: boolean;
+  bulkRestockApply: boolean;
+  restockConfirmation: boolean;
+}
+
 const RestockConfig = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -46,6 +54,12 @@ const RestockConfig = () => {
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [tempAmount, setTempAmount] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [features, setFeatures] = useState<RestockFeatures>({
+    restockEnabled: true,
+    quickRestockButtons: true,
+    bulkRestockApply: true,
+    restockConfirmation: true
+  });
 
   // Parse user data
   const parseUserData = useCallback(() => {
@@ -59,14 +73,44 @@ const RestockConfig = () => {
     }
   }, [params.user]);
 
+  // Load restock configuration
+  const loadRestockFeatures = useCallback(async () => {
+    try {
+      const config = await configService.getConfiguration();
+      console.log('Loaded restock features:', config);
+      
+      // Set features with defaults if not found in config
+      setFeatures({
+        restockEnabled: config.restockEnabled !== false,
+        quickRestockButtons: config.quickRestockButtons !== false,
+        bulkRestockApply: config.bulkRestockApply !== false,
+        restockConfirmation: config.restockConfirmation !== false
+      });
+    } catch (error) {
+      console.error('Error loading restock features:', error);
+      // Keep default values if error
+    }
+  }, []);
+
   useEffect(() => {
     parseUserData();
-  }, [parseUserData]);
+    loadRestockFeatures();
+  }, [parseUserData, loadRestockFeatures]);
 
   // Load initial stock data
   const loadInitialData = useCallback(async () => {
     try {
       setIsLoading(true);
+      
+      // Check if restock is enabled before loading data
+      if (!features.restockEnabled) {
+        Alert.alert(
+          "Restock Disabled", 
+          "The restock module is currently disabled by the administrator."
+        );
+        return;
+      }
+
       const data = await restockService.getCurrentStock();
       
       const initialData: StockItem[] = data.map((item: any) => ({
@@ -78,23 +122,29 @@ const RestockConfig = () => {
       }));
       
       setStockData(initialData);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading stock data:', error);
       Alert.alert('Error', 'Failed to load stock data');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [features.restockEnabled]);
 
   useEffect(() => {
-    loadInitialData();
-  }, [loadInitialData]);
+    if (features.restockEnabled) {
+      loadInitialData();
+    } else {
+      setIsLoading(false);
+    }
+  }, [features.restockEnabled, loadInitialData]);
 
   const handleBack = useCallback(() => {
     router.back();
   }, [router]);
 
   const updateRestockAmount = useCallback((key: string, amount: number) => {
+    if (!features.restockEnabled) return;
+    
     setStockData(prevData =>
       prevData.map(item =>
         item.key === key
@@ -102,14 +152,18 @@ const RestockConfig = () => {
           : item
       )
     );
-  }, []);
+  }, [features.restockEnabled]);
 
   const handleDirectInput = useCallback((key: string, text: string) => {
+    if (!features.restockEnabled) return;
+    
     const numericValue = text.replace(/[^0-9]/g, '');
     setTempAmount(numericValue);
-  }, []);
+  }, [features.restockEnabled]);
 
   const saveDirectInput = useCallback((key: string) => {
+    if (!features.restockEnabled) return;
+    
     if (tempAmount === "") {
       setEditingItem(null);
       return;
@@ -121,14 +175,39 @@ const RestockConfig = () => {
     }
     setEditingItem(null);
     setTempAmount("");
-  }, [tempAmount, updateRestockAmount]);
+  }, [tempAmount, updateRestockAmount, features.restockEnabled]);
 
   const startEditing = useCallback((key: string, currentAmount: number) => {
+    if (!features.restockEnabled) {
+      Alert.alert(
+        "Restock Disabled", 
+        "The restock functionality has been disabled by the administrator."
+      );
+      return;
+    }
+    
     setEditingItem(key);
     setTempAmount(currentAmount.toString());
-  }, []);
+  }, [features.restockEnabled]);
 
   const applyCustomAmount = useCallback(() => {
+    if (!features.restockEnabled) {
+      Alert.alert(
+        "Restock Disabled", 
+        "The restock functionality has been disabled by the administrator."
+      );
+      return;
+    }
+
+    // Check if bulk restock is enabled
+    if (!features.bulkRestockApply) {
+      Alert.alert(
+        "Bulk Restock Disabled", 
+        "Bulk restock functionality has been disabled by the administrator."
+      );
+      return;
+    }
+
     if (!customAmount) return;
 
     const amount = parseInt(customAmount);
@@ -141,25 +220,48 @@ const RestockConfig = () => {
       prevData.map(item => ({ ...item, restockAmount: amount }))
     );
     setCustomAmount("");
-  }, [customAmount]);
+  }, [customAmount, features.restockEnabled, features.bulkRestockApply]);
 
-  const handleRestock = useCallback(async () => {
-    if (!currentUser) {
-      Alert.alert("Error", "User not found");
+  const handleQuickAdd = useCallback((key: string, amount: number) => {
+    if (!features.restockEnabled) {
+      Alert.alert(
+        "Restock Disabled", 
+        "The restock functionality has been disabled by the administrator."
+      );
       return;
     }
 
-    const totalRestock = stockData.reduce(
-      (sum, item) => sum + item.restockAmount,
-      0
-    );
-
-    if (totalRestock === 0) {
-      Alert.alert("No Items", "Please add some items to restock first");
+    // Check if quick restock buttons are enabled
+    if (!features.quickRestockButtons) {
+      Alert.alert(
+        "Quick Buttons Disabled", 
+        "Quick restock buttons have been disabled by the administrator."
+      );
       return;
     }
 
+    updateRestockAmount(key, amount);
+  }, [features.restockEnabled, features.quickRestockButtons, updateRestockAmount]);
+
+const handleRestock = useCallback(async () => {
+  if (!currentUser) {
+    Alert.alert("Error", "User not found");
+    return;
+  }
+
+  // Declare processRestock function first
+  const processRestock = async () => {
     try {
+      const totalRestock = stockData.reduce(
+        (sum, item) => sum + item.restockAmount,
+        0
+      );
+
+      if (totalRestock === 0) {
+        Alert.alert("No Items", "Please add some items to restock first");
+        return;
+      }
+
       // Prepare restock data
       const restockData = stockData
         .filter(item => item.restockAmount > 0)
@@ -183,15 +285,76 @@ const RestockConfig = () => {
           params: { user: JSON.stringify(currentUser) }
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error processing restock:', error);
       Alert.alert("Error", "Failed to process restock. Please try again.");
     }
-  }, [currentUser, stockData, router]);
+  };
+
+  // Double-check if restock is enabled before processing
+  try {
+    const config = await configService.getConfiguration();
+    const enabled = config.restockEnabled !== false;
+    
+    if (!enabled) {
+      Alert.alert(
+        "Restock Disabled", 
+        "The restock functionality has been disabled by the administrator. Please contact your administrator."
+      );
+      return;
+    }
+
+    // Check if confirmation is required
+    if (config.restockConfirmation !== false) {
+      const totalRestock = stockData.reduce(
+        (sum, item) => sum + item.restockAmount,
+        0
+      );
+      
+      Alert.alert(
+        "Confirm Restock",
+        `Are you sure you want to restock ${totalRestock} items?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          { 
+            text: "Confirm", 
+            onPress: processRestock
+          }
+        ]
+      );
+    } else {
+      await processRestock();
+    }
+  } catch (error) {
+    console.error('Error checking restock status:', error);
+  }
+}, [currentUser, stockData, router, features.restockConfirmation]);
 
   const getTotalRestock = useCallback(() => {
     return stockData.reduce((sum, item) => sum + item.restockAmount, 0);
   }, [stockData]);
+
+  // Disabled state component
+  const DisabledRestockState = () => (
+    <View className="flex-1 justify-center items-center px-8">
+      <View className="bg-warning/10 rounded-full p-6 mb-4">
+        <Icon name="inventory" size={48} color="#F59E0B" />
+      </View>
+      <Text className="text-warning text-xl font-bold text-center mb-2">
+        Restock Module Disabled
+      </Text>
+      <Text className="text-neutral-500 text-center mb-6">
+        The restock functionality is currently disabled by the administrator.
+        Please contact your administrator to enable restocking.
+      </Text>
+      <TouchableOpacity 
+        className="bg-primary rounded-lg py-3 px-6"
+        onPress={handleBack}
+      >
+        <Text className="text-white font-semibold text-lg">Go Back</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   // Empty state component
   const EmptyStockState = () => (
@@ -219,6 +382,36 @@ const RestockConfig = () => {
     return (
       <View className="flex-1 bg-neutral-50 justify-center items-center">
         <Text className="text-lg text-gray-700">Loading restock data...</Text>
+      </View>
+    );
+  }
+
+  // Show disabled state if restock is not enabled
+  if (!features.restockEnabled) {
+    return (
+      <View className="flex-1 bg-neutral-50">
+        {/* Header with Back Button */}
+        <View className="bg-primary p-4">
+          <View className="flex-row items-center">
+            <TouchableOpacity 
+              onPress={handleBack}
+              className="mr-3 p-1"
+            >
+              <Icon name="arrow-back" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Text className="text-white text-xl font-bold flex-1 text-center">
+              Restock Uniforms
+            </Text>
+            <View className="w-8" />
+          </View>
+          {currentUser && (
+            <Text className="text-accent-100 text-sm text-center mt-1">
+              Restocking as: {currentUser.name}
+            </Text>
+          )}
+        </View>
+
+        <DisabledRestockState />
       </View>
     );
   }
@@ -281,55 +474,57 @@ const RestockConfig = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 20 }}
       >
-        {/* Quick Actions Card */}
-        <View className="mx-4 mt-4 bg-white rounded-xl shadow-lg border border-accent-100">
-          <View className="p-4 border-b border-accent-100">
-            <Text className="text-primary text-lg font-bold">
-              Quick Actions
-            </Text>
-          </View>
-          
-          <View className="p-4">
-            {/* Custom Amount Input */}
-            <View className="mb-4">
-              <Text className="text-neutral-500 text-sm mb-2">
-                Apply custom amount to all sizes:
+        {/* Quick Actions Card - Only show if bulk restock is enabled */}
+        {features.bulkRestockApply && (
+          <View className="mx-4 mt-4 bg-white rounded-xl shadow-lg border border-accent-100">
+            <View className="p-4 border-b border-accent-100">
+              <Text className="text-primary text-lg font-bold">
+                Quick Actions
               </Text>
-              <View className="flex-row">
-                <TextInput
-                  className="flex-1 bg-neutral-50 border border-accent-100 rounded-lg px-4 py-3 text-primary"
-                  placeholder="Enter amount"
-                  keyboardType="numeric"
-                  value={customAmount}
-                  onChangeText={setCustomAmount}
-                />
-                <TouchableOpacity
-                  onPress={applyCustomAmount}
-                  className="ml-2 bg-secondary rounded-lg px-4 justify-center"
-                >
-                  <Text className="text-white font-semibold">Apply</Text>
-                </TouchableOpacity>
-              </View>
             </View>
-
-            {/* Total Restock Summary */}
-            <View className="bg-primary/10 rounded-lg p-3">
-              <View className="flex-row justify-between items-center">
-                <Text className="text-primary font-semibold">
-                  Total to Restock
+            
+            <View className="p-4">
+              {/* Custom Amount Input */}
+              <View className="mb-4">
+                <Text className="text-neutral-500 text-sm mb-2">
+                  Apply custom amount to all sizes:
                 </Text>
-                <View className="bg-primary rounded-full px-3 py-1">
-                  <Text className="text-white font-bold text-lg">
-                    {getTotalRestock()}
-                  </Text>
+                <View className="flex-row">
+                  <TextInput
+                    className="flex-1 bg-neutral-50 border border-accent-100 rounded-lg px-4 py-3 text-primary"
+                    placeholder="Enter amount"
+                    keyboardType="numeric"
+                    value={customAmount}
+                    onChangeText={setCustomAmount}
+                  />
+                  <TouchableOpacity
+                    onPress={applyCustomAmount}
+                    className="ml-2 bg-secondary rounded-lg px-4 justify-center"
+                  >
+                    <Text className="text-white font-semibold">Apply</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
-              <Text className="text-neutral-500 text-xs mt-1">
-                items across all sizes
-              </Text>
+
+              {/* Total Restock Summary */}
+              <View className="bg-primary/10 rounded-lg p-3">
+                <View className="flex-row justify-between items-center">
+                  <Text className="text-primary font-semibold">
+                    Total to Restock
+                  </Text>
+                  <View className="bg-primary rounded-full px-3 py-1">
+                    <Text className="text-white font-bold text-lg">
+                      {getTotalRestock()}
+                    </Text>
+                  </View>
+                </View>
+                <Text className="text-neutral-500 text-xs mt-1">
+                  items across all sizes
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
+        )}
 
         {/* Size Containers */}
         <View className="mx-4 mt-6 mb-3">
@@ -445,22 +640,22 @@ const RestockConfig = () => {
                 </TouchableOpacity>
               </View>
 
-              {/* Quick Add Buttons */}
-              <View className="flex-row justify-between mt-3">
-                {[5, 10, 15].map((amount) => (
-                  <TouchableOpacity
-                    key={amount}
-                    onPress={() =>
-                      updateRestockAmount(item.key, item.restockAmount + amount)
-                    }
-                    className="bg-secondary/20 rounded-lg px-3 py-2 flex-1 mx-1"
-                  >
-                    <Text className="text-secondary text-sm font-semibold text-center">
-                      +{amount}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              {/* Quick Add Buttons - Only show if quick restock buttons are enabled */}
+              {features.quickRestockButtons && (
+                <View className="flex-row justify-between mt-3">
+                  {[5, 10, 15].map((amount) => (
+                    <TouchableOpacity
+                      key={amount}
+                      onPress={() => handleQuickAdd(item.key, item.restockAmount + amount)}
+                      className="bg-secondary/20 rounded-lg px-3 py-2 flex-1 mx-1"
+                    >
+                      <Text className="text-secondary text-sm font-semibold text-center">
+                        +{amount}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </View>
           ))}
         </View>

@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { shopService } from '../../../services/shopService';
 
 type Quantities = {
   xs: number;
@@ -39,17 +40,7 @@ const RejectedConfirmation = () => {
         xxxl: 0
       };
 
-  const availableStock: Quantities = params.availableStock 
-    ? JSON.parse(params.availableStock as string)
-    : {
-        xs: 15,
-        small: 20,
-        medium: 25,
-        large: 18,
-        xl: 12,
-        xxl: 8,
-        xxxl: 5
-      };
+  const userData = params.user ? JSON.parse(params.user as string) : null;
 
   const sizeLabels = {
     xs: 'Extra Small',
@@ -63,38 +54,41 @@ const RejectedConfirmation = () => {
 
   const totalItems = Object.values(rejectedQuantities).reduce((sum, qty) => sum + qty, 0);
 
-  const handleConfirmRejection = () => {
+  const handleConfirmRejection = async () => {
     if (!comment.trim()) {
       Alert.alert('Comment Required', 'Please provide a reason for rejecting these items.');
       return;
     }
 
-    // Calculate new stock after rejection
-    const newStock: Quantities = {
-      xs: availableStock.xs - rejectedQuantities.xs,
-      small: availableStock.small - rejectedQuantities.small,
-      medium: availableStock.medium - rejectedQuantities.medium,
-      large: availableStock.large - rejectedQuantities.large,
-      xl: availableStock.xl - rejectedQuantities.xl,
-      xxl: availableStock.xxl - rejectedQuantities.xxl,
-      xxxl: availableStock.xxxl - rejectedQuantities.xxxl
-    };
+    if (!userData) {
+      Alert.alert('Error', 'User data not found');
+      return;
+    }
 
-    // Here you would typically send the rejection data to your backend
-    console.log('Rejected items:', rejectedQuantities);
-    console.log('New stock after rejection:', newStock);
-    console.log('Rejection reason:', comment);
-    
-    Alert.alert(
-      'Rejection Confirmed',
-      `Successfully rejected ${totalItems} items. Stock has been updated.`,
-      [
-        {
-          text: 'OK',
-          onPress: () => router.replace('../(tabs)')
-        }
-      ]
-    );
+    try {
+      // Process rejected items using shopService
+      const rejectedData = {
+        quantities: rejectedQuantities,
+        userId: userData.id
+      };
+
+      const result = await shopService.processRejected(rejectedData);
+      
+      Alert.alert(
+        'Rejection Confirmed',
+        `Successfully rejected ${totalItems} items. Stock has been updated.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => router.replace('/(user)/(tabs)')
+          }
+        ]
+      );
+      
+    } catch (error) {
+      console.error('Error processing rejection:', error);
+      Alert.alert('Error', 'Failed to process rejection. Please try again.');
+    }
   };
 
   const handleCancel = () => {
@@ -131,9 +125,6 @@ const RejectedConfirmation = () => {
           <View className="space-y-3">
             {Object.entries(rejectedQuantities).map(([size, quantity]) => {
               if (quantity > 0) {
-                const currentStock = availableStock[size as keyof Quantities];
-                const newStock = currentStock - quantity;
-                
                 return (
                   <View key={size} className="border-b border-neutral-100 pb-3">
                     <View className="flex-row justify-between items-center py-2">
@@ -146,10 +137,6 @@ const RejectedConfirmation = () => {
                           to reject
                         </Text>
                       </View>
-                    </View>
-                    <View className="flex-row justify-between text-xs">
-                      <Text className="text-neutral-500">Current stock: {currentStock}</Text>
-                      <Text className="text-orange-500">New stock: {newStock}</Text>
                     </View>
                   </View>
                 );

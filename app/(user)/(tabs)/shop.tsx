@@ -14,15 +14,6 @@ import {
 import { configService } from "../../../services/database";
 import { shopService } from "../../../services/shopService";
 
-// Import images
-const extraSmallImg = require("../../../assets/images/size-shirt/extra-small.png");
-const smallImg = require("../../../assets/images/size-shirt/small.png");
-const mediumImg = require("../../../assets/images/size-shirt/medium.png");
-const largeImg = require("../../../assets/images/size-shirt/large.png");
-const xlImg = require("../../../assets/images/size-shirt/extra-large.png");
-const xxlImg = require("../../../assets/images/size-shirt/extra-extra-large.png");
-const xxxlImg = require("../../../assets/images/size-shirt/extra-extra-extra-large.png");
-
 type TabType = "available" | "rejected" | "returned";
 
 interface Quantities {
@@ -278,31 +269,34 @@ const Shop = () => {
           return;
         }
         
-        // Navigate to reservation screen
+        // Navigate to reservation screen - FIXED PATH
         router.push({
-          pathname: "/reserve_information",
+          pathname: "../(shop)/reserve_information",
           params: {
             quantities: JSON.stringify(currentQuantities),
-            user: JSON.stringify(currentUser)
+            user: JSON.stringify(currentUser),
+            availableStock: JSON.stringify(availableStock)
           },
         });
       } else {
-        // Navigate to sale information screen
+        // Navigate to sale information screen - FIXED PATH
         router.push({
-          pathname: "/information",
+          pathname: "../(shop)/information",
           params: {
             quantities: JSON.stringify(currentQuantities),
-            user: JSON.stringify(currentUser)
+            user: JSON.stringify(currentUser),
+            availableStock: JSON.stringify(availableStock)
           },
         });
       }
     } else if (activeTab === "rejected") {
-      // Process rejected items
+      // Process rejected items - FIXED PATH
       router.push({
-        pathname: "/rejected_confirmation",
+        pathname: "../(shop)/rejected_confirmation",
         params: {
           rejectedQuantities: JSON.stringify(currentQuantities),
-          user: JSON.stringify(currentUser)
+          user: JSON.stringify(currentUser),
+          availableStock: JSON.stringify(availableStock)
         },
       });
     } else if (activeTab === "returned") {
@@ -315,11 +309,13 @@ const Shop = () => {
         return;
       }
       
+      // Process returned items - FIXED PATH
       router.push({
-        pathname: "/returned_confirmation",
+        pathname: "../(shop)/returned_confirmation",
         params: {
           returnedQuantities: JSON.stringify(currentQuantities),
-          user: JSON.stringify(currentUser)
+          user: JSON.stringify(currentUser),
+          availableStock: JSON.stringify(availableStock)
         },
       });
     }
