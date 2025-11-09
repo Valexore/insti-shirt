@@ -1,6 +1,6 @@
 // app/(shop)/information.tsx
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -35,6 +35,14 @@ type CollegeOption = {
   image: any;
 };
 
+type ItemData = {
+  id: string;
+  name: string;
+  price: number;
+  image: string;
+  description?: string;
+};
+
 const Information = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -52,45 +60,54 @@ const Information = () => {
         xxxl: 0
       };
 
+  // Parse item data from params
+  const itemData: ItemData = params.itemData 
+    ? JSON.parse(params.itemData as string)
+    : null;
+
   const [fullName, setFullName] = useState('');
   const [studentId, setStudentId] = useState('');
   const [orNumber, setOrNumber] = useState('');
   const [selectedCollege, setSelectedCollege] = useState<CollegeOption | null>(null);
   const [showCollegeModal, setShowCollegeModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Get colleges from service
   const [collegeOptions, setCollegeOptions] = useState<CollegeOption[]>([]);
 
-React.useEffect(() => {
-  const loadColleges = async () => {
-    try {
-      const colleges = await shopService.getAvailableColleges();
-      // Map colleges to the expected format without requiring images
-      const formattedColleges = colleges.map(college => ({
-        id: college.id,
-        name: college.name,
-        image: null // No image required
-      }));
-      setCollegeOptions(formattedColleges);
-    } catch (error) {
-      console.error('Error loading colleges:', error);
-      // Fallback colleges without images
-      setCollegeOptions([
-        { id: 'coe', name: 'College of Engineering', image: null },
-        { id: 'cas', name: 'College of Arts and Sciences', image: null },
-        { id: 'cob', name: 'College of Business', image: null },
-        { id: 'ccje', name: 'College of Criminal Justice Education', image: null },
-        { id: 'cte', name: 'College of Teacher Education', image: null },
-      ]);
-    }
-  };
+  useEffect(() => {
+    const loadColleges = async () => {
+      try {
+        const colleges = await shopService.getAvailableColleges();
+        // Map colleges to the expected format without requiring images
+        const formattedColleges = colleges.map(college => ({
+          id: college.id,
+          name: college.name,
+          image: null // No image required
+        }));
+        setCollegeOptions(formattedColleges);
+      } catch (error) {
+        console.error('Error loading colleges:', error);
+        // Fallback colleges without images
+        setCollegeOptions([
+          { id: 'coe', name: 'College of Engineering', image: null },
+          { id: 'cas', name: 'College of Arts and Sciences', image: null },
+          { id: 'cob', name: 'College of Business', image: null },
+          { id: 'ccje', name: 'College of Criminal Justice Education', image: null },
+          { id: 'cte', name: 'College of Teacher Education', image: null },
+        ]);
+      }
+    };
 
-  loadColleges();
-}, []);
+    loadColleges();
+  }, []);
 
   const handleSubmit = async () => {
     if (!isFormValid) return;
+    
+    // Check if item data is available
+    if (!itemData) {
+      Alert.alert('Error', 'No item data found. Please go back and try again.');
+      return;
+    }
     
     setIsSubmitting(true);
     
@@ -105,13 +122,15 @@ React.useEffect(() => {
       };
       
       console.log('Order data:', orderData);
+      console.log('Item data:', itemData);
       
-      // Navigate to confirmation page with the order data
+      // Navigate to confirmation page with the order data and item data
       router.push({
         pathname: '/confirmation',
         params: {
           orderData: JSON.stringify(orderData),
-          user: params.user // Pass user data along
+          user: params.user, // Pass user data along
+          itemData: JSON.stringify(itemData) // Pass item data along
         }
       });
       
@@ -129,6 +148,9 @@ React.useEffect(() => {
   };
 
   const isFormValid = fullName && studentId && orNumber && selectedCollege;
+
+  // Calculate total items for display
+  const totalItems = Object.values(quantities).reduce((sum, qty) => sum + qty, 0);
 
   return (
     <KeyboardAvoidingView 
@@ -149,6 +171,18 @@ React.useEffect(() => {
           </Text>
         </View>
 
+        {/* Order Summary Banner */}
+        {itemData && (
+          <View className="bg-accent-50 mx-4 mt-4 p-3 rounded-lg border border-accent-100">
+            <Text className="text-primary font-semibold text-center">
+              Ordering: {itemData.name} - ₱{itemData.price.toLocaleString()} each
+            </Text>
+            <Text className="text-neutral-600 text-center mt-1">
+              Total Items: {totalItems} | Total: ₱{(totalItems * itemData.price).toLocaleString()}
+            </Text>
+          </View>
+        )}
+
         {/* Form */}
         <View className="p-4">
           <InputField
@@ -156,6 +190,7 @@ React.useEffect(() => {
             value={fullName}
             onChangeText={setFullName}
             placeholder="Enter your full name"
+            autoCapitalize="words"
           />
 
           <InputField
@@ -163,6 +198,7 @@ React.useEffect(() => {
             value={studentId}
             onChangeText={setStudentId}
             placeholder="Enter your student ID"
+            autoCapitalize="characters"
           />
 
           <InputField
@@ -197,9 +233,18 @@ React.useEffect(() => {
             disabled={!isFormValid || isSubmitting}
           >
             <Text className="text-white text-lg font-semibold">
-              {isSubmitting ? 'Submitting...' : 'Submit Order'}
+              {isSubmitting ? 'Submitting...' : 'Continue to Confirmation'}
             </Text>
           </TouchableOpacity>
+
+          {/* Warning if no item data */}
+          {!itemData && (
+            <View className="mt-4 p-3 bg-error-50 border border-error-200 rounded-lg">
+              <Text className="text-error text-center font-semibold">
+                Item data missing. Please go back and try again.
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -209,15 +254,17 @@ React.useEffect(() => {
         onClose={() => setShowCollegeModal(false)}
         title="Select College"
       >
-        <View className="p-4">
-          {collegeOptions.map((college) => (
-            <CollegeOption
-              key={college.id}
-              college={college}
-              onSelect={handleCollegeSelect}
-              isSelected={selectedCollege?.id === college.id}
-            />
-          ))}
+        <View className="p-4 max-h-80">
+          <ScrollView>
+            {collegeOptions.map((college) => (
+              <CollegeOption
+                key={college.id}
+                college={college}
+                onSelect={handleCollegeSelect}
+                isSelected={selectedCollege?.id === college.id}
+              />
+            ))}
+          </ScrollView>
         </View>
       </Modal>
     </KeyboardAvoidingView>

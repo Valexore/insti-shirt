@@ -16,11 +16,20 @@ type Quantities = {
   xxxl: number;
 };
 
+// Define the type for item data
+type ItemData = {
+  id: string;
+  name: string;
+  price: number;
+  image: string;
+  description?: string;
+};
+
 const Confirmation = () => {
   const params = useLocalSearchParams();
   const router = useRouter();
   
-  // Parse the order data with proper typing
+  // Parse all data with proper typing
   const orderData = params.orderData ? JSON.parse(params.orderData as string) as {
     quantities: Quantities;
     fullName: string;
@@ -30,13 +39,14 @@ const Confirmation = () => {
   } : null;
 
   const userData = params.user ? JSON.parse(params.user as string) : null;
+  const itemData = params.itemData ? JSON.parse(params.itemData as string) as ItemData : null;
 
-  if (!orderData) {
+  if (!orderData || !itemData) {
     return (
       <View className="flex-1 bg-neutral-50 justify-center items-center p-8">
         <Ionicons name="warning-outline" size={64} color="#991b1b" />
         <Text className="text-error text-xl font-bold mt-4 text-center">
-          No order data found
+          {!orderData ? 'No order data found' : 'No item data found'}
         </Text>
         <TouchableOpacity 
           onPress={() => router.back()}
@@ -50,8 +60,9 @@ const Confirmation = () => {
 
   const { quantities, fullName, studentId, orNumber, college } = orderData;
 
-  // Calculate total items and amount (assuming fixed price)
-  const shirtPrice = 299; // Example price
+  // Use the actual item price from admin configuration
+  const shirtPrice = itemData.price;
+  const itemName = itemData.name;
   
   // Now TypeScript knows quantities is of type Quantities
   const totalItems = Object.values(quantities).reduce((sum, qty) => sum + qty, 0);
@@ -74,7 +85,7 @@ const Confirmation = () => {
         return;
       }
 
-      // Process the sale using shopService
+      // Process the sale using shopService with item data
       const saleData = {
         quantities: quantities,
         customerInfo: {
@@ -84,14 +95,17 @@ const Confirmation = () => {
           college: college?.name
         },
         userId: userData.id,
-        totalAmount: totalAmount
+        totalAmount: totalAmount,
+        itemId: itemData.id,
+        itemName: itemData.name,
+        itemPrice: itemData.price
       };
 
       const result = await shopService.processSale(saleData);
       
       Alert.alert(
         'Order Confirmed!',
-        `Successfully processed order for ${totalItems} item${totalItems !== 1 ? 's' : ''}. Total: ₱${totalAmount.toLocaleString()}`,
+        `Successfully processed order for ${totalItems} ${itemName}${totalItems !== 1 ? 's' : ''}. Total: ₱${totalAmount.toLocaleString()}`,
         [
           {
             text: 'OK',
@@ -132,6 +146,28 @@ const Confirmation = () => {
       </View>
 
       <ScrollView className="flex-1 p-4">
+        {/* Item Information Card */}
+        <View className="bg-white rounded-xl p-5 mb-4 shadow-sm border border-accent-100">
+          <View className="flex-row items-center mb-3">
+            <Ionicons name="cube" size={20} color="#831843" />
+            <Text className="text-primary text-lg font-bold ml-2">
+              Item Information
+            </Text>
+          </View>
+          
+          <View className="space-y-2">
+            <View className="flex-row justify-between">
+              <Text className="text-neutral-500">Item Name</Text>
+              <Text className="text-neutral-800 font-semibold">{itemName}</Text>
+            </View>
+            
+            <View className="flex-row justify-between">
+              <Text className="text-neutral-500">Price per item</Text>
+              <Text className="text-neutral-800 font-semibold">₱{shirtPrice.toLocaleString()}</Text>
+            </View>
+          </View>
+        </View>
+
         {/* Personal Information Card */}
         <View className="bg-white rounded-xl p-5 mb-4 shadow-sm border border-accent-100">
           <View className="flex-row items-center mb-3">
@@ -185,7 +221,7 @@ const Confirmation = () => {
                       {sizeLabels[size as keyof typeof sizeLabels]}
                     </Text>
                     <View className="flex-row items-center space-x-4">
-                      <Text className="text-neutral-500">x{quantity}  </Text>
+                      <Text className="text-neutral-500">x{quantity}</Text>
                       <Text className="text-primary font-semibold">
                         ₱{(quantity * shirtPrice).toLocaleString()} 
                       </Text>
@@ -200,13 +236,13 @@ const Confirmation = () => {
           {/* Total Summary */}
           <View className="mt-4 pt-4 border-t border-neutral-200">
             <View className="flex-row justify-between mb-2">
-              <Text className="text-neutral-500">Subtotal</Text>
-              <Text className="text-neutral-800">₱{totalAmount.toLocaleString()}</Text>
+              <Text className="text-neutral-500">Items</Text>
+              <Text className="text-neutral-800">{totalItems}</Text>
             </View>
             
             <View className="flex-row justify-between mb-2">
-              <Text className="text-neutral-500">Items</Text>
-              <Text className="text-neutral-800">{totalItems}</Text>
+              <Text className="text-neutral-500">Price per item</Text>
+              <Text className="text-neutral-800">₱{shirtPrice.toLocaleString()}</Text>
             </View>
             
             <View className="flex-row justify-between mt-3 pt-3 border-t border-neutral-200">
