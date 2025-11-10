@@ -95,3 +95,22 @@ Release 0.0.11a -> 10/26/2025
         -improved data visualization and reporting
     -shop user experience updates
 ----------------------------------------------------------------
+
+Release 0.0.11ab -> 11/10/2025
+----------------------------------------------------------------
+    -Integrated dynamic pricing from admin configuration instead of hardcoded values
+    -Added ItemData type interface with id, name, price, and image properties
+    -Enhanced confirmation.tsx to use actual item prices from admin settings
+    -Updated information.tsx to parse and validate item data from route parameterss
+    -Added new "Item Information" card in confirmation page showing item details
+    -Implemented order summary banner in information page displaying real-time pricing
+    -Fixed React import consistency in information.tsx (useEffect vs React.useEffect)
+    -Improved error handling for missing item data in both pages
+    -Enhanced navigation flow to properly pass itemData between screens
+    -Updated sale processing to include item metadata (id, name, price)
+    -Added scrollable college modal for better user experience with many options
+    -Modified button text from "Submit Order" to "Continue to Confirmation"
+    -Implemented comprehensive data validation throughout ordering process
+    -Fixed hardcoded price issue (was always ₱299, now uses admin-configured prices)
+    -Added proper TypeScript type safety for all item-related data
+----------------------------------------------------------------
