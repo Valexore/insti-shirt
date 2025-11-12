@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
+  Dimensions,
   Image,
   ScrollView,
   Text,
@@ -10,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import { configService } from "../../../services/database";
 import { restockService } from "../../../services/restockService";
@@ -60,6 +62,9 @@ const RestockConfig = () => {
     bulkRestockApply: true,
     restockConfirmation: true
   });
+
+  // Get screen dimensions
+  const { height: screenHeight } = Dimensions.get('window');
 
   // Parse user data
   const parseUserData = useCallback(() => {
@@ -380,46 +385,48 @@ const handleRestock = useCallback(async () => {
 
   if (isLoading) {
     return (
-      <View className="flex-1 bg-neutral-50 justify-center items-center">
+      <SafeAreaView className="flex-1 bg-neutral-50 justify-center items-center">
         <Text className="text-lg text-gray-700">Loading restock data...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   // Show disabled state if restock is not enabled
   if (!features.restockEnabled) {
     return (
-      <View className="flex-1 bg-neutral-50">
-        {/* Header with Back Button */}
-        <View className="bg-primary p-4">
-          <View className="flex-row items-center">
-            <TouchableOpacity 
-              onPress={handleBack}
-              className="mr-3 p-1"
-            >
-              <Icon name="arrow-back" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-            <Text className="text-white text-xl font-bold flex-1 text-center">
-              Restock Uniforms
-            </Text>
-            <View className="w-8" />
-          </View>
-          {currentUser && (
-            <Text className="text-accent-100 text-sm text-center mt-1">
-              Restocking as: {currentUser.name}
-            </Text>
-          )}
-        </View>
+<SafeAreaView className="flex-1" edges={['top']}>
+  {/* Header with Back Button */}
+  <View className="bg-primary p-4">
+    <View className="flex-row items-center">
+      <TouchableOpacity 
+        onPress={handleBack}
+        className="mr-3 p-1"
+      >
+        <Icon name="arrow-back" size={24} color="#FFFFFF" />
+      </TouchableOpacity>
+      <Text className="text-white text-xl font-bold flex-1 text-center">
+        Restock Uniforms
+      </Text>
+      <View className="w-8" />
+    </View>
+    {currentUser && (
+      <Text className="text-accent-100 text-sm text-center mt-1">
+        Restocking as: {currentUser.name}
+      </Text>
+    )}
+  </View>
 
-        <DisabledRestockState />
-      </View>
+  <View className="flex-1 bg-neutral-50">
+    <DisabledRestockState />
+  </View>
+</SafeAreaView>
     );
   }
 
   // Add empty state check
   if (stockData.length === 0) {
     return (
-      <View className="flex-1 bg-neutral-50">
+      <SafeAreaView className="flex-1 bg-neutral-50">
         {/* Header with Back Button */}
         <View className="bg-primary p-4">
           <View className="flex-row items-center">
@@ -442,12 +449,12 @@ const handleRestock = useCallback(async () => {
         </View>
 
         <EmptyStockState />
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View className="flex-1 bg-neutral-50">
+    <SafeAreaView className="flex-1 bg-neutral-50" edges={['top']}>
       {/* Header with Back Button */}
       <View className="bg-primary p-4">
         <View className="flex-row items-center">
@@ -469,217 +476,223 @@ const handleRestock = useCallback(async () => {
         )}
       </View>
 
-      <ScrollView 
-        className="flex-1" 
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 20 }}
-      >
-        {/* Quick Actions Card - Only show if bulk restock is enabled */}
-        {features.bulkRestockApply && (
-          <View className="mx-4 mt-4 bg-white rounded-xl shadow-lg border border-accent-100">
-            <View className="p-4 border-b border-accent-100">
-              <Text className="text-primary text-lg font-bold">
-                Quick Actions
-              </Text>
-            </View>
-            
-            <View className="p-4">
-              {/* Custom Amount Input */}
-              <View className="mb-4">
-                <Text className="text-neutral-500 text-sm mb-2">
-                  Apply custom amount to all sizes:
-                </Text>
-                <View className="flex-row">
-                  <TextInput
-                    className="flex-1 bg-neutral-50 border border-accent-100 rounded-lg px-4 py-3 text-primary"
-                    placeholder="Enter amount"
-                    keyboardType="numeric"
-                    value={customAmount}
-                    onChangeText={setCustomAmount}
-                  />
-                  <TouchableOpacity
-                    onPress={applyCustomAmount}
-                    className="ml-2 bg-secondary rounded-lg px-4 justify-center"
-                  >
-                    <Text className="text-white font-semibold">Apply</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Total Restock Summary */}
-              <View className="bg-primary/10 rounded-lg p-3">
-                <View className="flex-row justify-between items-center">
-                  <Text className="text-primary font-semibold">
-                    Total to Restock
-                  </Text>
-                  <View className="bg-primary rounded-full px-3 py-1">
-                    <Text className="text-white font-bold text-lg">
-                      {getTotalRestock()}
-                    </Text>
-                  </View>
-                </View>
-                <Text className="text-neutral-500 text-xs mt-1">
-                  items across all sizes
+      {/* Main Content Area */}
+      <View className="flex-1">
+        <ScrollView 
+          className="flex-1" 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ 
+            paddingBottom: 120, // Increased padding for button space
+            flexGrow: 1 
+          }}
+        >
+          {/* Quick Actions Card - Only show if bulk restock is enabled */}
+          {features.bulkRestockApply && (
+            <View className="mx-4 mt-4 bg-white rounded-xl shadow-lg border border-accent-100">
+              <View className="p-4 border-b border-accent-100">
+                <Text className="text-primary text-lg font-bold">
+                  Quick Actions
                 </Text>
               </View>
-            </View>
-          </View>
-        )}
-
-        {/* Size Containers */}
-        <View className="mx-4 mt-6 mb-3">
-          <Text className="text-primary text-lg font-bold">
-            Size-wise Restocking
-          </Text>
-          <Text className="text-neutral-500 text-sm">
-            Set restock quantities for each size
-          </Text>
-        </View>
-
-        {/* Size Containers Grid */}
-        <View className="mx-4 mb-4">
-          {stockData.map((item) => (
-            <View
-              key={item.key}
-              className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-accent-100"
-            >
-              <View className="flex-row items-center justify-between">
-                {/* Size Image and Basic Info */}
-                <View className="flex-row items-center flex-1">
-                  <View className="w-16 h-16 bg-neutral-50 rounded-lg border border-accent-100 overflow-hidden items-center justify-center">
-                    <Image
-                      source={item.image}
-                      className="w-14 h-14"
-                      resizeMode="contain"
-                    />
-                  </View>
-
-                  <View className="ml-3 flex-1">
-                    <Text className="text-primary text-lg font-semibold">
-                      {item.label}
-                    </Text>
-                    <Text className="text-neutral-500 text-sm">
-                      Size: {item.key.toUpperCase()}
-                    </Text>
-                    <Text className="text-neutral-500 text-sm">
-                      Current: {item.currentStock} units
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Restock Count Display */}
-                <View className="items-end">
-                  <View className="bg-primary/10 rounded-lg p-2">
-                    <Text className="text-primary text-lg font-bold text-center">
-                      {item.restockAmount}
-                    </Text>
-                    <Text className="text-neutral-500 text-xs text-center">
-                      to add
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Input Stepper with Direct Input */}
-              <View className="flex-row items-center justify-between mt-4">
-                <TouchableOpacity
-                  onPress={() =>
-                    updateRestockAmount(item.key, item.restockAmount - 1)
-                  }
-                  className={`w-10 h-10 rounded-lg items-center justify-center ${
-                    item.restockAmount > 0
-                      ? "bg-error/20"
-                      : "bg-neutral-100"
-                  }`}
-                  disabled={item.restockAmount === 0}
-                >
-                  <Text
-                    className={`text-lg font-bold ${
-                      item.restockAmount > 0 ? "text-error" : "text-neutral-400"
-                    }`}
-                  >
-                    -
+              
+              <View className="p-4">
+                {/* Custom Amount Input */}
+                <View className="mb-4">
+                  <Text className="text-neutral-500 text-sm mb-2">
+                    Apply custom amount to all sizes:
                   </Text>
-                </TouchableOpacity>
-
-                {/* Direct Input Field */}
-                <TouchableOpacity
-                  onPress={() => startEditing(item.key, item.restockAmount)}
-                  className="flex-1 mx-3"
-                >
-                  {editingItem === item.key ? (
+                  <View className="flex-row">
                     <TextInput
-                      className="bg-neutral-50 border-2 border-secondary rounded-lg py-3 text-primary text-xl font-bold text-center"
-                      value={tempAmount}
-                      onChangeText={(text) => handleDirectInput(item.key, text)}
-                      onBlur={() => saveDirectInput(item.key)}
-                      onSubmitEditing={() => saveDirectInput(item.key)}
+                      className="flex-1 bg-neutral-50 border border-accent-100 rounded-lg px-4 py-3 text-primary"
+                      placeholder="Enter amount"
                       keyboardType="numeric"
-                      autoFocus
-                      selectTextOnFocus
+                      value={customAmount}
+                      onChangeText={setCustomAmount}
                     />
-                  ) : (
-                    <View className="bg-neutral-50 border border-accent-100 rounded-lg py-3">
-                      <Text className="text-primary text-xl font-bold text-center">
-                        {item.restockAmount}
+                    <TouchableOpacity
+                      onPress={applyCustomAmount}
+                      className="ml-2 bg-secondary rounded-lg px-4 justify-center"
+                    >
+                      <Text className="text-white font-semibold">Apply</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Total Restock Summary */}
+                <View className="bg-primary/10 rounded-lg p-3">
+                  <View className="flex-row justify-between items-center">
+                    <Text className="text-primary font-semibold">
+                      Total to Restock
+                    </Text>
+                    <View className="bg-primary rounded-full px-3 py-1">
+                      <Text className="text-white font-bold text-lg">
+                        {getTotalRestock()}
                       </Text>
                     </View>
-                  )}
-                  <Text className="text-neutral-500 text-xs text-center mt-1">
-                    {editingItem === item.key ? "Press enter to save" : "Tap to edit"}
+                  </View>
+                  <Text className="text-neutral-500 text-xs mt-1">
+                    items across all sizes
                   </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() =>
-                    updateRestockAmount(item.key, item.restockAmount + 1)
-                  }
-                  className="w-10 h-10 bg-success/20 rounded-lg items-center justify-center"
-                >
-                  <Text className="text-success text-lg font-bold">+</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Quick Add Buttons - Only show if quick restock buttons are enabled */}
-              {features.quickRestockButtons && (
-                <View className="flex-row justify-between mt-3">
-                  {[5, 10, 15].map((amount) => (
-                    <TouchableOpacity
-                      key={amount}
-                      onPress={() => handleQuickAdd(item.key, item.restockAmount + amount)}
-                      className="bg-secondary/20 rounded-lg px-3 py-2 flex-1 mx-1"
-                    >
-                      <Text className="text-secondary text-sm font-semibold text-center">
-                        +{amount}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
                 </View>
-              )}
+              </View>
             </View>
-          ))}
-        </View>
-      </ScrollView>
+          )}
 
-      {/* Restock Button */}
-      <View className="p-4 border-t border-accent-100 bg-white">
-        <TouchableOpacity
-          onPress={handleRestock}
-          className={`rounded-lg py-4 items-center ${
-            getTotalRestock() > 0 ? "bg-secondary" : "bg-neutral-300"
-          }`}
-          disabled={getTotalRestock() === 0}
-        >
-          <Text
-            className={`text-lg font-semibold ${
-              getTotalRestock() > 0 ? "text-white" : "text-neutral-500"
+          {/* Size Containers */}
+          <View className="mx-4 mt-6 mb-3">
+            <Text className="text-primary text-lg font-bold">
+              Size-wise Restocking
+            </Text>
+            <Text className="text-neutral-500 text-sm">
+              Set restock quantities for each size
+            </Text>
+          </View>
+
+          {/* Size Containers Grid */}
+          <View className="mx-4 mb-6">
+            {stockData.map((item) => (
+              <View
+                key={item.key}
+                className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-accent-100"
+              >
+                <View className="flex-row items-center justify-between">
+                  {/* Size Image and Basic Info */}
+                  <View className="flex-row items-center flex-1">
+                    <View className="w-16 h-16 bg-neutral-50 rounded-lg border border-accent-100 overflow-hidden items-center justify-center">
+                      <Image
+                        source={item.image}
+                        className="w-14 h-14"
+                        resizeMode="contain"
+                      />
+                    </View>
+
+                    <View className="ml-3 flex-1">
+                      <Text className="text-primary text-lg font-semibold">
+                        {item.label}
+                      </Text>
+                      <Text className="text-neutral-500 text-sm">
+                        Size: {item.key.toUpperCase()}
+                      </Text>
+                      <Text className="text-neutral-500 text-sm">
+                        Current: {item.currentStock} units
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Restock Count Display */}
+                  <View className="items-end">
+                    <View className="bg-primary/10 rounded-lg p-2">
+                      <Text className="text-primary text-lg font-bold text-center">
+                        {item.restockAmount}
+                      </Text>
+                      <Text className="text-neutral-500 text-xs text-center">
+                        to add
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Input Stepper with Direct Input */}
+                <View className="flex-row items-center justify-between mt-4">
+                  <TouchableOpacity
+                    onPress={() =>
+                      updateRestockAmount(item.key, item.restockAmount - 1)
+                    }
+                    className={`w-10 h-10 rounded-lg items-center justify-center ${
+                      item.restockAmount > 0
+                        ? "bg-error/20"
+                        : "bg-neutral-100"
+                    }`}
+                    disabled={item.restockAmount === 0}
+                  >
+                    <Text
+                      className={`text-lg font-bold ${
+                        item.restockAmount > 0 ? "text-error" : "text-neutral-400"
+                      }`}
+                    >
+                      -
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Direct Input Field */}
+                  <TouchableOpacity
+                    onPress={() => startEditing(item.key, item.restockAmount)}
+                    className="flex-1 mx-3"
+                  >
+                    {editingItem === item.key ? (
+                      <TextInput
+                        className="bg-neutral-50 border-2 border-secondary rounded-lg py-3 text-primary text-xl font-bold text-center"
+                        value={tempAmount}
+                        onChangeText={(text) => handleDirectInput(item.key, text)}
+                        onBlur={() => saveDirectInput(item.key)}
+                        onSubmitEditing={() => saveDirectInput(item.key)}
+                        keyboardType="numeric"
+                        autoFocus
+                        selectTextOnFocus
+                      />
+                    ) : (
+                      <View className="bg-neutral-50 border border-accent-100 rounded-lg py-3">
+                        <Text className="text-primary text-xl font-bold text-center">
+                          {item.restockAmount}
+                        </Text>
+                      </View>
+                    )}
+                    <Text className="text-neutral-500 text-xs text-center mt-1">
+                      {editingItem === item.key ? "Press enter to save" : "Tap to edit"}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() =>
+                      updateRestockAmount(item.key, item.restockAmount + 1)
+                    }
+                    className="w-10 h-10 bg-success/20 rounded-lg items-center justify-center"
+                  >
+                    <Text className="text-success text-lg font-bold">+</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Quick Add Buttons - Only show if quick restock buttons are enabled */}
+                {features.quickRestockButtons && (
+                  <View className="flex-row justify-between mt-3">
+                    {[5, 10, 15].map((amount) => (
+                      <TouchableOpacity
+                        key={amount}
+                        onPress={() => handleQuickAdd(item.key, item.restockAmount + amount)}
+                        className="bg-secondary/20 rounded-lg px-3 py-2 flex-1 mx-1"
+                      >
+                        <Text className="text-secondary text-sm font-semibold text-center">
+                          +{amount}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+
+        {/* Restock Button - Fixed at bottom with proper safe area handling */}
+        <View className="bg-white border-t border-accent-100 pb-8 pt-4 px-4">
+          <TouchableOpacity
+            onPress={handleRestock}
+            className={`rounded-lg py-4 items-center ${
+              getTotalRestock() > 0 ? "bg-secondary" : "bg-neutral-300"
             }`}
+            disabled={getTotalRestock() === 0}
           >
-            📦 Confirm Restock ({getTotalRestock()} items)
-          </Text>
-        </TouchableOpacity>
+            <Text
+              className={`text-lg font-semibold ${
+                getTotalRestock() > 0 ? "text-white" : "text-neutral-500"
+              }`}
+            >
+              📦 Confirm Restock ({getTotalRestock()} items)
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 

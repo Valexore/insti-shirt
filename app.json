@@ -24,7 +24,6 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.valexore.instishirt",
       "icon": "./assets/images/logo-app.png"
-      
     },
     "web": {
       "bundler": "metro",
@@ -46,7 +45,8 @@
           }
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

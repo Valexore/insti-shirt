@@ -1,6 +1,7 @@
 import { ArrowLeft } from 'lucide-react-native';
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useEffect } from 'react';
 import {
+  BackHandler,
   Modal as RNModal,
   ScrollView,
   Text,
@@ -23,11 +24,28 @@ const Modal: React.FC<ModalProps> = ({
   children,
   showCloseButton = true,
 }) => {
+  // Handle system back button
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        if (visible) {
+          onClose();
+          return true; // Prevent default behavior
+        }
+        return false; // Use default behavior
+      }
+    );
+
+    return () => backHandler.remove();
+  }, [visible, onClose]);
+
   return (
     <RNModal
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
+      onRequestClose={onClose} // Android back button
     >
       <View className="flex-1 bg-neutral-50">
         {/* Modal Header */}
