@@ -405,7 +405,7 @@ const handleRestock = useCallback(async () => {
         <Icon name="arrow-back" size={24} color="#FFFFFF" />
       </TouchableOpacity>
       <Text className="text-white text-xl font-bold flex-1 text-center">
-        Restock Uniforms hala
+        Restock Uniformss
       </Text>
       <View className="w-8" />
     </View>
