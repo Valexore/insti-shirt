@@ -26,6 +26,7 @@ interface SizeItem {
   image: any;
   price: number;
   stock: number;
+  image_key: string;
 }
 
 interface ShopConfiguration {
@@ -111,12 +112,18 @@ const Shop = () => {
         // Load items from database using shopService
         const items = await shopService.getAvailableItems();
         
-        setSizes(items);
+        // Cast items to include image_key for TypeScript
+        const itemsWithImageKey = items.map((item: any) => ({
+          ...item,
+          image_key: item.key // Use key as image_key since that's what your service returns
+        }));
+        
+        setSizes(itemsWithImageKey);
         
         // Set available stock dynamically
         const stock: Quantities = {};
         
-        items.forEach((item: SizeItem) => {
+        itemsWithImageKey.forEach((item: SizeItem) => {
           stock[item.key] = item.stock;
         });
         
@@ -127,7 +134,7 @@ const Shop = () => {
         const initialRejected: Quantities = {};
         const initialReturned: Quantities = {};
         
-        items.forEach((item: SizeItem) => {
+        itemsWithImageKey.forEach((item: SizeItem) => {
           initialQuantities[item.key] = 0;
           initialRejected[item.key] = 0;
           initialReturned[item.key] = 0;
@@ -269,28 +276,48 @@ const Shop = () => {
           return;
         }
         
-        // Navigate to reservation screen - FIXED PATH
+        // Get item data for reservation
+        const firstItem = sizes[0];
+        
+        // Navigate to reservation screen
         router.push({
           pathname: "../(shop)/reserve_information",
           params: {
             quantities: JSON.stringify(currentQuantities),
             user: JSON.stringify(currentUser),
-            availableStock: JSON.stringify(availableStock)
+            availableStock: JSON.stringify(availableStock),
+            itemData: JSON.stringify({
+              id: firstItem.key,
+              name: firstItem.label,
+              price: firstItem.price,
+              image: firstItem.image_key,
+              description: `${firstItem.label} Shirt`
+            })
           },
         });
       } else {
-        // Navigate to sale information screen - FIXED PATH
+        // Get item data for sale
+        const firstItem = sizes[0];
+        
+        // Navigate to sale information screen
         router.push({
           pathname: "../(shop)/information",
           params: {
             quantities: JSON.stringify(currentQuantities),
             user: JSON.stringify(currentUser),
-            availableStock: JSON.stringify(availableStock)
+            availableStock: JSON.stringify(availableStock),
+            itemData: JSON.stringify({
+              id: firstItem.key,
+              name: firstItem.label,
+              price: firstItem.price,
+              image: firstItem.image_key,
+              description: `${firstItem.label} Shirt`
+            })
           },
         });
       }
     } else if (activeTab === "rejected") {
-      // Process rejected items - FIXED PATH
+      // Process rejected items
       router.push({
         pathname: "../(shop)/rejected_confirmation",
         params: {
@@ -309,7 +336,7 @@ const Shop = () => {
         return;
       }
       
-      // Process returned items - FIXED PATH
+      // Process returned items
       router.push({
         pathname: "../(shop)/returned_confirmation",
         params: {

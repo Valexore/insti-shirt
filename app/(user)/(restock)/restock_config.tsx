@@ -47,6 +47,39 @@ interface RestockFeatures {
   restockConfirmation: boolean;
 }
 
+// Reusable Header Component
+const RestockHeader = ({ 
+  onBack, 
+  currentUser 
+}: { 
+  onBack: () => void; 
+  currentUser: UserData | null;
+}) => (
+  <View className="bg-primary p-4">
+    <View className="flex-row items-center justify-between">
+      <TouchableOpacity 
+        onPress={onBack}
+        className="p-1"
+      >
+        <Icon name="arrow-back" size={24} color="#FFFFFF" />
+      </TouchableOpacity>
+      
+      <Text className="text-white text-xl font-bold text-center flex-1 mx-4">
+        Restock Uniforms
+      </Text>
+      
+      {/* Spacer for balance */}
+      <View className="w-8" />
+    </View>
+    
+    {currentUser && (
+      <Text className="text-accent-100 text-sm text-center mt-1">
+        Restocking as: {currentUser.name}
+      </Text>
+    )}
+  </View>
+);
+
 const RestockConfig = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -248,92 +281,92 @@ const RestockConfig = () => {
     updateRestockAmount(key, amount);
   }, [features.restockEnabled, features.quickRestockButtons, updateRestockAmount]);
 
-const handleRestock = useCallback(async () => {
-  if (!currentUser) {
-    Alert.alert("Error", "User not found");
-    return;
-  }
-
-  // Declare processRestock function first
-  const processRestock = async () => {
-    try {
-      const totalRestock = stockData.reduce(
-        (sum, item) => sum + item.restockAmount,
-        0
-      );
-
-      if (totalRestock === 0) {
-        Alert.alert("No Items", "Please add some items to restock first");
-        return;
-      }
-
-      // Prepare restock data
-      const restockData = stockData
-        .filter(item => item.restockAmount > 0)
-        .map(item => ({
-          key: item.key,
-          amount: item.restockAmount
-        }));
-
-      // Process restock in database
-      const result = await restockService.processRestock(restockData, currentUser.id);
-
-      if (result.success) {
-        Alert.alert(
-          "Restock Confirmed",
-          `Successfully restocked ${result.totalRestocked} items across all sizes!`
-        );
-
-        // Navigate back to restock screen with updated data
-        router.replace({
-          pathname: '/(user)/(tabs)/restock',
-          params: { user: JSON.stringify(currentUser) }
-        });
-      }
-    } catch (error: any) {
-      console.error('Error processing restock:', error);
-      Alert.alert("Error", "Failed to process restock. Please try again.");
-    }
-  };
-
-  // Double-check if restock is enabled before processing
-  try {
-    const config = await configService.getConfiguration();
-    const enabled = config.restockEnabled !== false;
-    
-    if (!enabled) {
-      Alert.alert(
-        "Restock Disabled", 
-        "The restock functionality has been disabled by the administrator. Please contact your administrator."
-      );
+  const handleRestock = useCallback(async () => {
+    if (!currentUser) {
+      Alert.alert("Error", "User not found");
       return;
     }
 
-    // Check if confirmation is required
-    if (config.restockConfirmation !== false) {
-      const totalRestock = stockData.reduce(
-        (sum, item) => sum + item.restockAmount,
-        0
-      );
+    // Declare processRestock function first
+    const processRestock = async () => {
+      try {
+        const totalRestock = stockData.reduce(
+          (sum, item) => sum + item.restockAmount,
+          0
+        );
+
+        if (totalRestock === 0) {
+          Alert.alert("No Items", "Please add some items to restock first");
+          return;
+        }
+
+        // Prepare restock data
+        const restockData = stockData
+          .filter(item => item.restockAmount > 0)
+          .map(item => ({
+            key: item.key,
+            amount: item.restockAmount
+          }));
+
+        // Process restock in database
+        const result = await restockService.processRestock(restockData, currentUser.id);
+
+        if (result.success) {
+          Alert.alert(
+            "Restock Confirmed",
+            `Successfully restocked ${result.totalRestocked} items across all sizes!`
+          );
+
+          // Navigate back to restock screen with updated data
+          router.replace({
+            pathname: '/(user)/(tabs)/restock',
+            params: { user: JSON.stringify(currentUser) }
+          });
+        }
+      } catch (error: any) {
+        console.error('Error processing restock:', error);
+        Alert.alert("Error", "Failed to process restock. Please try again.");
+      }
+    };
+
+    // Double-check if restock is enabled before processing
+    try {
+      const config = await configService.getConfiguration();
+      const enabled = config.restockEnabled !== false;
       
-      Alert.alert(
-        "Confirm Restock",
-        `Are you sure you want to restock ${totalRestock} items?`,
-        [
-          { text: "Cancel", style: "cancel" },
-          { 
-            text: "Confirm", 
-            onPress: processRestock
-          }
-        ]
-      );
-    } else {
-      await processRestock();
+      if (!enabled) {
+        Alert.alert(
+          "Restock Disabled", 
+          "The restock functionality has been disabled by the administrator. Please contact your administrator."
+        );
+        return;
+      }
+
+      // Check if confirmation is required
+      if (config.restockConfirmation !== false) {
+        const totalRestock = stockData.reduce(
+          (sum, item) => sum + item.restockAmount,
+          0
+        );
+        
+        Alert.alert(
+          "Confirm Restock",
+          `Are you sure you want to restock ${totalRestock} items?`,
+          [
+            { text: "Cancel", style: "cancel" },
+            { 
+              text: "Confirm", 
+              onPress: processRestock
+            }
+          ]
+        );
+      } else {
+        await processRestock();
+      }
+    } catch (error) {
+      console.error('Error checking restock status:', error);
     }
-  } catch (error) {
-    console.error('Error checking restock status:', error);
-  }
-}, [currentUser, stockData, router, features.restockConfirmation]);
+  }, [currentUser, stockData, router, features.restockConfirmation]);
 
   const getTotalRestock = useCallback(() => {
     return stockData.reduce((sum, item) => sum + item.restockAmount, 0);
@@ -385,8 +418,11 @@ const handleRestock = useCallback(async () => {
 
   if (isLoading) {
     return (
-      <SafeAreaView className="flex-1 bg-neutral-50 justify-center items-center">
-        <Text className="text-lg text-gray-700">Loading restock data...</Text>
+      <SafeAreaView className="flex-1 bg-neutral-50" edges={['left', 'right']}>
+        <RestockHeader onBack={handleBack} currentUser={currentUser} />
+        <View className="flex-1 justify-center items-center">
+          <Text className="text-lg text-gray-700">Loading restock data...</Text>
+        </View>
       </SafeAreaView>
     );
   }
@@ -394,87 +430,30 @@ const handleRestock = useCallback(async () => {
   // Show disabled state if restock is not enabled
   if (!features.restockEnabled) {
     return (
-<SafeAreaView className="flex-1" edges={['top']}>
-  {/* Header with Back Button */}
-  <View className="bg-primary p-4">
-    <View className="flex-row items-center">
-      <TouchableOpacity 
-        onPress={handleBack}
-        className="mr-3 p-1"
-      >
-        <Icon name="arrow-back" size={24} color="#FFFFFF" />
-      </TouchableOpacity>
-      <Text className="text-white text-xl font-bold flex-1 text-center">
-        Restock Uniformss
-      </Text>
-      <View className="w-8" />
-    </View>
-    {currentUser && (
-      <Text className="text-accent-100 text-sm text-center mt-1">
-        Restocking as: {currentUser.name}
-      </Text>
-    )}
-  </View>
-
-  <View className="flex-1 bg-neutral-50">
-    <DisabledRestockState />
-  </View>
-</SafeAreaView>
+      <SafeAreaView className="flex-1 bg-neutral-50" edges={['left', 'right']}>
+        <RestockHeader onBack={handleBack} currentUser={currentUser} />
+        <View className="flex-1">
+          <DisabledRestockState />
+        </View>
+      </SafeAreaView>
     );
   }
 
   // Add empty state check
   if (stockData.length === 0) {
     return (
-      <SafeAreaView className="flex-1 bg-neutral-50">
-        {/* Header with Back Button */}
-        <View className="bg-primary p-4">
-          <View className="flex-row items-center">
-            <TouchableOpacity 
-              onPress={handleBack}
-              className="mr-3 p-1"
-            >
-              <Icon name="arrow-back" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-            <Text className="text-white text-xl font-bold flex-1 text-center">
-              Restock Uniforms
-            </Text>
-            <View className="w-8" />
-          </View>
-          {currentUser && (
-            <Text className="text-accent-100 text-sm text-center mt-1">
-              Restocking as: {currentUser.name}
-            </Text>
-          )}
+      <SafeAreaView className="flex-1 bg-neutral-50" edges={['left', 'right']}>
+        <RestockHeader onBack={handleBack} currentUser={currentUser} />
+        <View className="flex-1">
+          <EmptyStockState />
         </View>
-
-        <EmptyStockState />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-neutral-50" edges={['top']}>
-      {/* Header with Back Button */}
-      <View className="bg-primary p-4">
-        <View className="flex-row items-center">
-          <TouchableOpacity 
-            onPress={handleBack}
-            className="mr-3 p-1"
-          >
-            <Icon name="arrow-back" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          <Text className="text-white text-xl font-bold flex-1 text-center">
-            Restock Uniforms
-          </Text>
-          <View className="w-8" />
-        </View>
-        {currentUser && (
-          <Text className="text-accent-100 text-sm text-center mt-1">
-            Restocking as: {currentUser.name}
-          </Text>
-        )}
-      </View>
+    <SafeAreaView className="flex-1 bg-neutral-50" edges={['left', 'right']}>
+      <RestockHeader onBack={handleBack} currentUser={currentUser} />
 
       {/* Main Content Area */}
       <View className="flex-1">

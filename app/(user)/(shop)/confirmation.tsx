@@ -1,7 +1,7 @@
 // app/(shop)/confirmation.tsx
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { shopService } from '../../../services/shopService';
 
@@ -28,8 +28,11 @@ type ItemData = {
 const Confirmation = () => {
   const params = useLocalSearchParams();
   const router = useRouter();
+  const [isProcessing, setIsProcessing] = useState(false);
   
-  // Parse all data with proper typing
+  console.log('Confirmation params received:', Object.keys(params));
+  
+  // Parse all data with proper typing and fallbacks
   const orderData = params.orderData ? JSON.parse(params.orderData as string) as {
     quantities: Quantities;
     fullName: string;
@@ -39,14 +42,47 @@ const Confirmation = () => {
   } : null;
 
   const userData = params.user ? JSON.parse(params.user as string) : null;
-  const itemData = params.itemData ? JSON.parse(params.itemData as string) as ItemData : null;
+  const itemData = params.itemData ? JSON.parse(params.itemData as string) as ItemData : {
+    id: 'default',
+    name: 'University Shirt',
+    price: 299,
+    image: 'default',
+    description: 'Premium University Shirt'
+  };
 
-  if (!orderData || !itemData) {
+  // If no order data but we have quantities directly from params (fallback)
+  const quantities: Quantities = orderData?.quantities || (params.quantities ? JSON.parse(params.quantities as string) : {
+    xs: 0,
+    small: 0,
+    medium: 0,
+    large: 0,
+    xl: 0,
+    xxl: 0,
+    xxxl: 0
+  });
+
+  const fullName = orderData?.fullName || '';
+  const studentId = orderData?.studentId || '';
+  const orNumber = orderData?.orNumber || '';
+  const college = orderData?.college || { name: '' };
+
+  console.log('Parsed data:', {
+    hasOrderData: !!orderData,
+    userData: userData?.id,
+    itemData,
+    quantities,
+    totalItems: Object.values(quantities).reduce((sum, qty) => sum + qty, 0)
+  });
+
+  if (!userData) {
     return (
       <View className="flex-1 bg-neutral-50 justify-center items-center p-8">
         <Ionicons name="warning-outline" size={64} color="#991b1b" />
         <Text className="text-error text-xl font-bold mt-4 text-center">
-          {!orderData ? 'No order data found' : 'No item data found'}
+          User data not found
+        </Text>
+        <Text className="text-neutral-500 text-center mt-2">
+          Please go back and try again.
         </Text>
         <TouchableOpacity 
           onPress={() => router.back()}
@@ -58,13 +94,11 @@ const Confirmation = () => {
     );
   }
 
-  const { quantities, fullName, studentId, orNumber, college } = orderData;
-
-  // Use the actual item price from admin configuration
+  // Use the actual item price from item data
   const shirtPrice = itemData.price;
   const itemName = itemData.name;
   
-  // Now TypeScript knows quantities is of type Quantities
+  // Calculate totals
   const totalItems = Object.values(quantities).reduce((sum, qty) => sum + qty, 0);
   const totalAmount = totalItems * shirtPrice;
 
@@ -79,11 +113,28 @@ const Confirmation = () => {
   };
 
   const handleConfirmOrder = async () => {
+    if (isProcessing) return;
+    
     try {
+      setIsProcessing(true);
+      
       if (!userData) {
         Alert.alert('Error', 'User data not found');
         return;
       }
+
+      // Validate that we have at least one item
+      if (totalItems === 0) {
+        Alert.alert('Error', 'No items selected for order');
+        return;
+      }
+
+      console.log('Starting order processing...', {
+        userId: userData.id,
+        quantities,
+        totalItems,
+        totalAmount
+      });
 
       // Process the sale using shopService with item data
       const saleData = {
@@ -101,7 +152,11 @@ const Confirmation = () => {
         itemPrice: itemData.price
       };
 
+      console.log('Processing sale with data:', saleData);
+
       const result = await shopService.processSale(saleData);
+      
+      console.log('Sale processed successfully:', result);
       
       Alert.alert(
         'Order Confirmed!',
@@ -109,23 +164,47 @@ const Confirmation = () => {
         [
           {
             text: 'OK',
-            onPress: () => router.replace('/(user)/(tabs)')
+            onPress: () => {
+              console.log('Navigating back to tabs...');
+              // Use navigate instead of replace to ensure clean state
+              router.navigate({
+                pathname: '/(user)/(tabs)',
+                params: { 
+                  user: JSON.stringify(userData),
+                  // Force refresh by adding timestamp
+                  refresh: Date.now()
+                }
+              });
+            }
           }
         ]
       );
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error confirming order:', error);
-      Alert.alert('Error', 'Failed to process order. Please try again.');
+      Alert.alert(
+        'Error', 
+        `Failed to process order: ${error.message || 'Please try again.'}`
+      );
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const handleEditOrder = () => {
+    console.log('Going back to edit order...');
     router.back();
   };
 
   const handleCancel = () => {
-    router.replace('/(user)/(tabs)');
+    console.log('Cancelling order...');
+    router.navigate({
+      pathname: '/(user)/(tabs)',
+      params: { 
+        user: JSON.stringify(userData),
+        refresh: Date.now()
+      }
+    });
   };
 
   return (
@@ -142,6 +221,11 @@ const Confirmation = () => {
           <Text className="text-accent-100 text-center mt-1">
             Review your order details before confirming
           </Text>
+          {isProcessing && (
+            <Text className="text-accent-100 text-center mt-2">
+              Processing order...
+            </Text>
+          )}
         </View>
       </View>
 
@@ -165,6 +249,15 @@ const Confirmation = () => {
               <Text className="text-neutral-500">Price per item</Text>
               <Text className="text-neutral-800 font-semibold">₱{shirtPrice.toLocaleString()}</Text>
             </View>
+
+            {itemData.description && (
+              <View className="flex-row justify-between">
+                <Text className="text-neutral-500">Description</Text>
+                <Text className="text-neutral-800 font-semibold text-right">
+                  {itemData.description}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -180,23 +273,23 @@ const Confirmation = () => {
           <View className="space-y-2">
             <View className="flex-row justify-between">
               <Text className="text-neutral-500">Full Name</Text>
-              <Text className="text-neutral-800 font-semibold">{fullName}</Text>
+              <Text className="text-neutral-800 font-semibold">{fullName || 'Not provided'}</Text>
             </View>
             
             <View className="flex-row justify-between">
               <Text className="text-neutral-500">Student ID</Text>
-              <Text className="text-neutral-800 font-semibold">{studentId}</Text>
+              <Text className="text-neutral-800 font-semibold">{studentId || 'Not provided'}</Text>
             </View>
             
             <View className="flex-row justify-between">
               <Text className="text-neutral-500">OR Number</Text>
-              <Text className="text-neutral-800 font-semibold">{orNumber}</Text>
+              <Text className="text-neutral-800 font-semibold">{orNumber || 'Not provided'}</Text>
             </View>
             
             <View className="flex-row justify-between">
               <Text className="text-neutral-500">College</Text>
               <Text className="text-neutral-800 font-semibold text-right">
-                {college?.name}
+                {college?.name || 'Not selected'}
               </Text>
             </View>
           </View>
@@ -233,10 +326,20 @@ const Confirmation = () => {
             })}
           </View>
 
+          {/* Show message if no items selected */}
+          {totalItems === 0 && (
+            <View className="py-4 items-center">
+              <Ionicons name="alert-circle-outline" size={32} color="#6b7280" />
+              <Text className="text-neutral-500 text-center mt-2">
+                No items selected
+              </Text>
+            </View>
+          )}
+
           {/* Total Summary */}
           <View className="mt-4 pt-4 border-t border-neutral-200">
             <View className="flex-row justify-between mb-2">
-              <Text className="text-neutral-500">Items</Text>
+              <Text className="text-neutral-500">Total Items</Text>
               <Text className="text-neutral-800">{totalItems}</Text>
             </View>
             
@@ -261,25 +364,44 @@ const Confirmation = () => {
         <View className="flex-row space-x-4 mb-4">
           <TouchableOpacity 
             onPress={handleEditOrder}
-            className="flex-1 bg-white border border-primary rounded-xl py-4 items-center"
+            disabled={isProcessing}
+            className={`flex-1 border rounded-xl py-4 items-center ${
+              isProcessing ? 'border-neutral-300' : 'border-primary'
+            }`}
           >
-            <Text className="text-primary text-lg font-semibold">Edit Order</Text>
+            <Text className={`text-lg font-semibold ${
+              isProcessing ? 'text-neutral-400' : 'text-primary'
+            }`}>
+              Edit Order
+            </Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
             onPress={handleConfirmOrder}
-            className="flex-1 bg-success rounded-xl py-4 items-center shadow-sm"
+            disabled={totalItems === 0 || isProcessing}
+            className={`flex-1 rounded-xl py-4 items-center shadow-sm ${
+              totalItems > 0 && !isProcessing ? 'bg-success' : 'bg-neutral-400'
+            }`}
           >
-            <Text className="text-white text-lg font-semibold">Confirm Order</Text>
+            <Text className="text-white text-lg font-semibold">
+              {isProcessing ? 'Processing...' : totalItems > 0 ? 'Confirm Order' : 'No Items'}
+            </Text>
           </TouchableOpacity>
         </View>
         
         {/* Cancel button with proper spacing */}
         <TouchableOpacity 
           onPress={handleCancel}
-          className="py-4 items-center border border-neutral-300 rounded-xl"
+          disabled={isProcessing}
+          className={`py-4 items-center border rounded-xl ${
+            isProcessing ? 'border-neutral-300' : 'border-neutral-300'
+          }`}
         >
-          <Text className="text-neutral-500 text-lg font-semibold">Cancel Order</Text>
+          <Text className={`text-lg font-semibold ${
+            isProcessing ? 'text-neutral-400' : 'text-neutral-500'
+          }`}>
+            Cancel Order
+          </Text>
         </TouchableOpacity>
       </View>
     </View>

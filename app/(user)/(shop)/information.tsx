@@ -60,10 +60,16 @@ const Information = () => {
         xxxl: 0
       };
 
-  // Parse item data from params
+  // Parse item data from params with fallback
   const itemData: ItemData = params.itemData 
     ? JSON.parse(params.itemData as string)
-    : null;
+    : {
+        id: 'default',
+        name: 'University Shirt',
+        price: 299,
+        image: 'default',
+        description: 'Premium University Shirt'
+      };
 
   const [fullName, setFullName] = useState('');
   const [studentId, setStudentId] = useState('');
@@ -81,12 +87,12 @@ const Information = () => {
         const formattedColleges = colleges.map(college => ({
           id: college.id,
           name: college.name,
-          image: null // No image required
+          image: college.image // Use the image from the service
         }));
         setCollegeOptions(formattedColleges);
       } catch (error) {
         console.error('Error loading colleges:', error);
-        // Fallback colleges without images
+        // Fallback colleges
         setCollegeOptions([
           { id: 'coe', name: 'College of Engineering', image: null },
           { id: 'cas', name: 'College of Arts and Sciences', image: null },
@@ -102,12 +108,6 @@ const Information = () => {
 
   const handleSubmit = async () => {
     if (!isFormValid) return;
-    
-    // Check if item data is available
-    if (!itemData) {
-      Alert.alert('Error', 'No item data found. Please go back and try again.');
-      return;
-    }
     
     setIsSubmitting(true);
     
@@ -172,16 +172,14 @@ const Information = () => {
         </View>
 
         {/* Order Summary Banner */}
-        {itemData && (
-          <View className="bg-accent-50 mx-4 mt-4 p-3 rounded-lg border border-accent-100">
-            <Text className="text-primary font-semibold text-center">
-              Ordering: {itemData.name} - ₱{itemData.price.toLocaleString()} each
-            </Text>
-            <Text className="text-neutral-600 text-center mt-1">
-              Total Items: {totalItems} | Total: ₱{(totalItems * itemData.price).toLocaleString()}
-            </Text>
-          </View>
-        )}
+        <View className="bg-accent-50 mx-4 mt-4 p-3 rounded-lg border border-accent-100">
+          <Text className="text-primary font-semibold text-center">
+            Ordering: {itemData.name} - ₱{itemData.price.toLocaleString()} each
+          </Text>
+          <Text className="text-neutral-600 text-center mt-1">
+            Total Items: {totalItems} | Total: ₱{(totalItems * itemData.price).toLocaleString()}
+          </Text>
+        </View>
 
         {/* Form */}
         <View className="p-4">
@@ -236,15 +234,6 @@ const Information = () => {
               {isSubmitting ? 'Submitting...' : 'Continue to Confirmation'}
             </Text>
           </TouchableOpacity>
-
-          {/* Warning if no item data */}
-          {!itemData && (
-            <View className="mt-4 p-3 bg-error-50 border border-error-200 rounded-lg">
-              <Text className="text-error text-center font-semibold">
-                Item data missing. Please go back and try again.
-              </Text>
-            </View>
-          )}
         </View>
       </ScrollView>
 
