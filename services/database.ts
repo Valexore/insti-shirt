@@ -29,11 +29,12 @@ interface Item {
   image_key: string;
   price: number;
   stock: number;
+  sold: number; // ADDED: Sold tracking
   rejected: number;
   low_stock_threshold: number;
   enabled: boolean;
   created_at: string;
-  reserved?: number; // Make optional since it's not in the table schema
+  reserved?: number;
 }
 
 interface College {
@@ -76,7 +77,7 @@ interface Activity {
   items?: string;
   timestamp: string;
   created_at: string;
-  user_name?: string; // Joined field from users table
+  user_name?: string;
 }
 
 // Type for SQLite result
@@ -116,7 +117,7 @@ export const initDatabase = (): Promise<void> => {
         );
       `);
 
-      // Items table
+      // Items table - UPDATED: Added sold column
       db.execSync(`
         CREATE TABLE IF NOT EXISTS items (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -125,6 +126,7 @@ export const initDatabase = (): Promise<void> => {
           image_key TEXT NOT NULL,
           price INTEGER NOT NULL,
           stock INTEGER DEFAULT 0,
+          sold INTEGER DEFAULT 0, -- ADDED: Sold tracking
           rejected INTEGER DEFAULT 0,
           low_stock_threshold INTEGER DEFAULT 5,
           enabled BOOLEAN DEFAULT 1,
@@ -172,7 +174,7 @@ export const initDatabase = (): Promise<void> => {
         );
       `);
 
-      // NEW: Activities table
+      // Activities table
       db.execSync(`
         CREATE TABLE IF NOT EXISTS activities (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -248,20 +250,20 @@ export const initDatabase = (): Promise<void> => {
         // Only insert default items if the table is completely empty
         if (existingItems.length === 0) {
           const defaultItems = [
-            { key: 'xs', label: 'Extra Small', image_key: 'xs', price: 299, stock: 0, low_stock_threshold: 5 },
-            { key: 'small', label: 'Small', image_key: 'small', price: 299, stock: 0, low_stock_threshold: 5 },
-            { key: 'medium', label: 'Medium', image_key: 'medium', price: 299, stock: 0, low_stock_threshold: 5 },
-            { key: 'large', label: 'Large', image_key: 'large', price: 299, stock: 0, low_stock_threshold: 5 },
-            { key: 'xl', label: 'Extra Large', image_key: 'xl', price: 299, stock: 0, low_stock_threshold: 5 },
-            { key: 'xxl', label: '2X Large', image_key: 'xxl', price: 299, stock: 0, low_stock_threshold: 5 },
-            { key: 'xxxl', label: '3X Large', image_key: 'xxxl', price: 299, stock: 0, low_stock_threshold: 5 },
+            { key: 'xs', label: 'Extra Small', image_key: 'xs', price: 299, stock: 0, sold: 0, low_stock_threshold: 5 },
+            { key: 'small', label: 'Small', image_key: 'small', price: 299, stock: 0, sold: 0, low_stock_threshold: 5 },
+            { key: 'medium', label: 'Medium', image_key: 'medium', price: 299, stock: 0, sold: 0, low_stock_threshold: 5 },
+            { key: 'large', label: 'Large', image_key: 'large', price: 299, stock: 0, sold: 0, low_stock_threshold: 5 },
+            { key: 'xl', label: 'Extra Large', image_key: 'xl', price: 299, stock: 0, sold: 0, low_stock_threshold: 5 },
+            { key: 'xxl', label: '2X Large', image_key: 'xxl', price: 299, stock: 0, sold: 0, low_stock_threshold: 5 },
+            { key: 'xxxl', label: '3X Large', image_key: 'xxxl', price: 299, stock: 0, sold: 0, low_stock_threshold: 5 },
           ];
 
           defaultItems.forEach(item => {
             try {
               db.runSync(
-                `INSERT INTO items (key, label, image_key, price, stock, low_stock_threshold) VALUES (?, ?, ?, ?, ?, ?)`,
-                [item.key, item.label, item.image_key, item.price, item.stock, item.low_stock_threshold]
+                `INSERT INTO items (key, label, image_key, price, stock, sold, low_stock_threshold) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [item.key, item.label, item.image_key, item.price, item.stock, item.sold, item.low_stock_threshold]
               );
             } catch (error) {
               console.log(`Item ${item.key} already exists`);
@@ -408,7 +410,7 @@ export const userService = {
         updates.push('updated_at = datetime("now")');
         values.push(id);
 
-        if (updates.length > 1) { // More than just updated_at
+        if (updates.length > 1) {
           db.runSync(
             `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
             values
@@ -437,7 +439,7 @@ export const userService = {
   }
 };
 
-// Items operations
+// Items operations - UPDATED: Include sold field in all operations
 export const itemService = {
   getItems: (): Promise<Item[]> => {
     return new Promise((resolve, reject) => {
@@ -467,9 +469,9 @@ export const itemService = {
         const updates: string[] = [];
         const values: any[] = [];
 
-        // Add all fields that need updating
+        // Add all fields that need updating - UPDATED: Added 'sold'
         const fields: (keyof Item)[] = [
-          'key', 'label', 'image_key', 'price', 'stock', 'rejected', 
+          'key', 'label', 'image_key', 'price', 'stock', 'sold', 'rejected', 
           'low_stock_threshold', 'enabled'
         ];
 
@@ -502,14 +504,15 @@ export const itemService = {
     return new Promise((resolve, reject) => {
       try {
         const result = db.runSync(
-          `INSERT INTO items (key, label, image_key, price, stock, rejected, low_stock_threshold, enabled) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO items (key, label, image_key, price, stock, sold, rejected, low_stock_threshold, enabled) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             itemData.key,
             itemData.label,
             itemData.image_key,
             itemData.price,
             itemData.stock || 0,
+            itemData.sold || 0, // ADDED: Sold field
             itemData.rejected || 0,
             itemData.low_stock_threshold || 5,
             itemData.enabled !== undefined ? itemData.enabled : 1
@@ -523,6 +526,7 @@ export const itemService = {
           image_key: itemData.image_key,
           price: itemData.price,
           stock: itemData.stock || 0,
+          sold: itemData.sold || 0, // ADDED: Sold field
           rejected: itemData.rejected || 0,
           low_stock_threshold: itemData.low_stock_threshold || 5,
           enabled: itemData.enabled !== undefined ? itemData.enabled : true,
@@ -853,7 +857,7 @@ export const reportService = {
   }
 };
 
-// NEW: Activity operations
+// Activity operations
 export const activityService = {
   // Create new activity
   createActivity: (activityData: Omit<Activity, 'id' | 'created_at' | 'user_name'>): Promise<Activity> => {
@@ -891,35 +895,35 @@ export const activityService = {
   },
 
   // Get activities for a specific user
-getUserActivities: (userId: number, limit?: number): Promise<Activity[]> => {
-  return new Promise((resolve, reject) => {
-    try {
-      const query = limit 
-        ? `SELECT a.*, u.name as user_name FROM activities a 
-           LEFT JOIN users u ON a.user_id = u.id 
-           WHERE a.user_id = ? 
-           ORDER BY a.timestamp DESC 
-           LIMIT ?`
-        : `SELECT a.*, u.name as user_name FROM activities a 
-           LEFT JOIN users u ON a.user_id = u.id 
-           WHERE a.user_id = ? 
-           ORDER BY a.timestamp DESC`;
-      
-      const params = limit ? [userId, limit] : [userId];
-      const activities = db.getAllSync(query, params) as Activity[];
-      
-      // Parse items JSON if exists
-      const parsedActivities = activities.map(activity => ({
-        ...activity,
-        items: activity.items ? JSON.parse(activity.items) : undefined
-      }));
-      
-      resolve(parsedActivities);
-    } catch (error) {
-      reject(error);
-    }
-  });
-},
+  getUserActivities: (userId: number, limit?: number): Promise<Activity[]> => {
+    return new Promise((resolve, reject) => {
+      try {
+        const query = limit 
+          ? `SELECT a.*, u.name as user_name FROM activities a 
+             LEFT JOIN users u ON a.user_id = u.id 
+             WHERE a.user_id = ? 
+             ORDER BY a.timestamp DESC 
+             LIMIT ?`
+          : `SELECT a.*, u.name as user_name FROM activities a 
+             LEFT JOIN users u ON a.user_id = u.id 
+             WHERE a.user_id = ? 
+             ORDER BY a.timestamp DESC`;
+        
+        const params = limit ? [userId, limit] : [userId];
+        const activities = db.getAllSync(query, params) as Activity[];
+        
+        // Parse items JSON if exists
+        const parsedActivities = activities.map(activity => ({
+          ...activity,
+          items: activity.items ? JSON.parse(activity.items) : undefined
+        }));
+        
+        resolve(parsedActivities);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  },
 
   // Get all activities (for admin view)
   getAllActivities: (limit?: number): Promise<Activity[]> => {
@@ -1005,7 +1009,7 @@ getUserActivities: (userId: number, limit?: number): Promise<Activity[]> => {
   }
 };
 
-// Database resetter - UPDATED: Now also resets configuration tables
+// Database resetter
 export const resetDatabase = async (): Promise<void> => {
   return new Promise((resolve, reject) => {
     try {
@@ -1038,7 +1042,7 @@ export const resetDatabase = async (): Promise<void> => {
   });
 };
 
-// NEW: Function to clear only items (for development/testing)
+// Function to clear only items (for development/testing)
 export const clearAllItems = async (): Promise<void> => {
   return new Promise((resolve, reject) => {
     try {

@@ -50,7 +50,7 @@ export const shopService = {
         .map(college => ({
           id: college.id,
           name: college.name,
-          image: require('../assets/images/logo-app.png') // Fixed path
+          image: require('../assets/images/logo-app.png')
         }));
     } catch (error) {
       console.error('Error getting colleges:', error);
@@ -77,21 +77,24 @@ export const shopService = {
     }
   },
 
-  // Process a sale (update stock and user stats)
+  // Process a sale (update stock and user stats) - UPDATED: Track sold quantities
   processSale: async (saleData: SaleData) => {
     try {
       const { quantities, customerInfo, userId, totalAmount } = saleData;
       const totalItems = Object.values(quantities).reduce((sum, qty) => sum + qty, 0);
       const soldItems: string[] = [];
 
-      // Update stock for each item
+      // Update stock for each item - UPDATED: Also update sold count
       for (const [size, quantity] of Object.entries(quantities)) {
         if (quantity > 0) {
           const item = await itemService.getItemByKey(size);
           if (item && item.enabled) {
             const newStock = Math.max(0, (item.stock || 0) - quantity);
+            const newSold = (item.sold || 0) + quantity; // ADDED: Track sold quantity
+            
             await itemService.updateItem(item.id, {
-              stock: newStock
+              stock: newStock,
+              sold: newSold // ADDED: Update sold count
             });
             soldItems.push(`${size}: ${quantity}`);
           }

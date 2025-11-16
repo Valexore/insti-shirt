@@ -18,6 +18,7 @@ interface StockItem {
   label: string;
   image: number;
   stock: number;
+  sold: number; // ADDED: Sold tracking
   lowStockThreshold: number;
   reserved: number;
   rejected: number;
@@ -40,21 +41,19 @@ const Restock = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRestockEnabled, setIsRestockEnabled] = useState(true);
 
-
-    useEffect(() => {
+  useEffect(() => {
     const checkRestockStatus = async () => {
       try {
         const enabled = await restockService.isRestockEnabled();
         setIsRestockEnabled(enabled);
       } catch (error) {
         console.error('Error checking restock status:', error);
-        setIsRestockEnabled(true); // Default to enabled on error
+        setIsRestockEnabled(true);
       }
     };
 
     checkRestockStatus();
   }, []);
-
 
   // Parse user data
   useEffect(() => {
@@ -90,15 +89,17 @@ const Restock = () => {
     loadStockData();
   }, []);
 
-  // Calculate summary statistics
+  // Calculate summary statistics - UPDATED: Added totalSold
   const summaryStats = React.useMemo(() => {
     const totalStock = stockData.reduce((sum, item) => sum + item.stock, 0);
+    const totalSold = stockData.reduce((sum, item) => sum + item.sold, 0); // ADDED: Total sold
     const totalReserved = stockData.reduce((sum, item) => sum + item.reserved, 0);
     const totalRejected = stockData.reduce((sum, item) => sum + item.rejected, 0);
     const totalReturned = stockData.reduce((sum, item) => sum + item.returned, 0);
 
     return {
       totalStock,
+      totalSold, // ADDED: Total sold
       totalReserved,
       totalRejected,
       totalReturned
@@ -153,7 +154,6 @@ const Restock = () => {
     return num.toLocaleString();
   };
 
-
   const DisabledRestockState = () => (
     <View className="flex-1 justify-center items-center px-8">
       <View className="bg-warning/10 rounded-full p-6 mb-4">
@@ -176,27 +176,6 @@ const Restock = () => {
       </TouchableOpacity>
     </View>
   );
-
-  // Show disabled state if restock is not enabled
-  if (!isRestockEnabled) {
-    return (
-      <View className="flex-1 bg-neutral-50">
-        {/* Header */}
-        <View className="bg-primary p-4">
-          <Text className="text-white text-xl font-bold text-center">
-            Stock Management
-          </Text>
-          {currentUser && (
-            <Text className="text-accent-100 text-sm text-center mt-1">
-              Welcome, {currentUser.name}
-            </Text>
-          )}
-        </View>
-        
-        <DisabledRestockState />
-      </View>
-    );
-  }
 
   // Empty state component
   const EmptyStockState = () => (
@@ -226,6 +205,27 @@ const Restock = () => {
     return (
       <View className="flex-1 bg-neutral-50 justify-center items-center">
         <Text className="text-lg text-gray-700">Loading stock data...</Text>
+      </View>
+    );
+  }
+
+  // Show disabled state if restock is not enabled
+  if (!isRestockEnabled) {
+    return (
+      <View className="flex-1 bg-neutral-50">
+        {/* Header */}
+        <View className="bg-primary p-4">
+          <Text className="text-white text-xl font-bold text-center">
+            Stock Management
+          </Text>
+          {currentUser && (
+            <Text className="text-accent-100 text-sm text-center mt-1">
+              Welcome, {currentUser.name}
+            </Text>
+          )}
+        </View>
+        
+        <DisabledRestockState />
       </View>
     );
   }
@@ -266,7 +266,7 @@ const Restock = () => {
       </View>
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        {/* Enhanced Stock Summary Card */}
+        {/* Enhanced Stock Summary Card - UPDATED: Added total sold */}
         <View className="mx-4 mt-4 bg-white rounded-xl shadow-lg border border-accent-100">
           <View className="p-4 border-b border-accent-100">
             <Text className="text-primary text-xl font-bold text-center">
@@ -289,6 +289,18 @@ const Restock = () => {
                 </Text>
               </View>
 
+              {/* Total Sold - ADDED: Sold statistics */}
+              <View className="items-center flex-1">
+                <View className="bg-green-100 p-3 rounded-full mb-2">
+                  <Text className="text-green-600 text-lg font-bold">
+                    {summaryStats.totalSold}
+                  </Text>
+                </View>
+                <Text className="text-neutral-500 text-xs text-center">
+                  Total Sold
+                </Text>
+              </View>
+
               {/* Reserved Items */}
               <View className="items-center flex-1">
                 <View className="bg-blue-100 p-3 rounded-full mb-2">
@@ -300,7 +312,10 @@ const Restock = () => {
                   Reserved
                 </Text>
               </View>
+            </View>
 
+            {/* Second Row for Rejected and Returned Items */}
+            <View className="flex-row justify-between">
               {/* Rejected Items */}
               <View className="items-center flex-1">
                 <View className="bg-orange-100 p-3 rounded-full mb-2">
@@ -312,10 +327,27 @@ const Restock = () => {
                   Rejected
                 </Text>
               </View>
+
+              {/* Spacer for balance */}
+              <View className="items-center flex-1">
+                {/* Empty space to maintain layout */}
+              </View>
+
+              {/* Returned Items */}
+              <View className="items-center flex-1">
+                <View className="bg-purple-100 p-3 rounded-full mb-2">
+                  <Text className="text-purple-600 text-lg font-bold">
+                    {summaryStats.totalReturned}
+                  </Text>
+                </View>
+                <Text className="text-neutral-500 text-xs text-center">
+                  Returned
+                </Text>
+              </View>
             </View>
 
             {/* Items Count */}
-            <View className="bg-neutral-50 rounded-lg p-3 mt-2">
+            <View className="bg-neutral-50 rounded-lg p-3 mt-4">
               <View className="flex-row justify-between items-center">
                 <Text className="text-primary font-semibold">
                   Available Items
@@ -385,6 +417,14 @@ const Restock = () => {
                         className={`text-sm font-medium ${getStockStatusColor(item.stock, item.lowStockThreshold)}`}
                       >
                         {getStockStatusText(item.stock, item.lowStockThreshold)}
+                      </Text>
+                    </View>
+
+                    {/* Sold Information - ADDED: Display sold count */}
+                    <View className="flex-row items-center mt-1">
+                      <View className="w-2 h-2 rounded-full mr-2 bg-green-500" />
+                      <Text className="text-green-600 text-sm font-medium">
+                        Sold: {formatNumber(item.sold)}
                       </Text>
                     </View>
                   </View>
@@ -457,7 +497,7 @@ const Restock = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Item Detail Modal */}
+      {/* Item Detail Modal - UPDATED: Added sold information */}
       <Modal
         visible={showItemModal}
         onClose={() => setShowItemModal(false)}
@@ -503,7 +543,7 @@ const Restock = () => {
                 </View>
               </View>
 
-              {/* Stock Information Grid */}
+              {/* Stock Information Grid - UPDATED: Added sold section */}
               <View className="grid grid-cols-2 gap-3 mb-4">
                 {/* Current Stock */}
                 <View className="bg-primary/5 rounded-lg p-3">
@@ -512,6 +552,15 @@ const Restock = () => {
                     {formatNumber(selectedItem.stock)}
                   </Text>
                   <Text className="text-neutral-500 text-xs">units available</Text>
+                </View>
+
+                {/* Total Sold - ADDED: Sold statistics */}
+                <View className="bg-green-50 rounded-lg p-3">
+                  <Text className="text-neutral-500 text-xs mb-1">Total Sold</Text>
+                  <Text className="text-green-600 text-2xl font-bold">
+                    {formatNumber(selectedItem.sold)}
+                  </Text>
+                  <Text className="text-neutral-500 text-xs">all time sales</Text>
                 </View>
 
                 {/* Reserved Items */}
@@ -530,15 +579,6 @@ const Restock = () => {
                     {formatNumber(selectedItem.rejected)}
                   </Text>
                   <Text className="text-neutral-500 text-xs">quality issues</Text>
-                </View>
-
-                {/* Returned Items */}
-                <View className="bg-purple-50 rounded-lg p-3">
-                  <Text className="text-neutral-500 text-xs mb-1">Returned Items</Text>
-                  <Text className="text-purple-600 text-2xl font-bold">
-                    {formatNumber(selectedItem.returned)}
-                  </Text>
-                  <Text className="text-neutral-500 text-xs">customer returns</Text>
                 </View>
               </View>
 
@@ -566,6 +606,29 @@ const Restock = () => {
                   </Text>
                   <Text className="text-neutral-500 text-xs">Full (30)</Text>
                 </View>
+              </View>
+
+              {/* Sales Performance - ADDED: Sales performance section */}
+              <View className="bg-green-50 rounded-lg p-4 mb-4 border border-green-200">
+                <Text className="text-green-700 font-semibold mb-2">Sales Performance</Text>
+                <View className="flex-row justify-between items-center">
+                  <View>
+                    <Text className="text-green-600 text-sm">Total Sold</Text>
+                    <Text className="text-green-700 text-xl font-bold">
+                      {formatNumber(selectedItem.sold)} units
+                    </Text>
+                  </View>
+                  <View className="bg-green-100 rounded-full px-3 py-1">
+                    <Text className="text-green-700 text-sm font-semibold">
+                      {selectedItem.stock + selectedItem.sold > 0 
+                        ? Math.round((selectedItem.sold / (selectedItem.stock + selectedItem.sold)) * 100)
+                        : 0}% Sold
+                    </Text>
+                  </View>
+                </View>
+                <Text className="text-green-600 text-xs mt-1">
+                  Out of {formatNumber(selectedItem.stock + selectedItem.sold)} total units handled
+                </Text>
               </View>
 
               {/* Available for Sale */}

@@ -14,8 +14,8 @@ import {
   TouchableWithoutFeedback,
   View
 } from 'react-native';
-import { initDatabase, userService } from '../../services/database';
-import Modal from '../components/Modal'; // Make sure to import your Modal component
+import { initDatabase, resetDatabase, userService } from '../../services/database';
+import Modal from '../components/Modal';
 
 const Login = () => {
   const router = useRouter();
@@ -26,6 +26,41 @@ const Login = () => {
   const [isDbInitialized, setIsDbInitialized] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Reset Database Function
+  const handleResetDatabase = async () => {
+    try {
+      Alert.alert(
+        'Reset Database',
+        'This will delete all data and reset the database. Continue?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Reset', 
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                setIsLoading(true);
+                await resetDatabase();
+                Alert.alert('Success', 'Database reset successfully! Please login again.');
+                // Clear form
+                setUsername('');
+                setPassword('');
+              } catch (error) {
+                Alert.alert('Error', 'Failed to reset database');
+                console.error(error);
+              } finally {
+                setIsLoading(false);
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      Alert.alert('Error', 'Failed to reset database');
+      console.error(error);
+    }
+  };
 
   // Initialize database on component mount
   useEffect(() => {
@@ -109,7 +144,7 @@ const Login = () => {
       // Handle specific error types with modal
       if (error instanceof Error) {
         if (error.message.includes('no such table')) {
-          showError('Database not properly initialized. Please restart the app.');
+          showError('Database not properly initialized. Please use the "Reset Database" button below.');
         } else if (error.message.includes('Invalid credentials or inactive account')) {
           showError('Invalid username or password. Please check your credentials and make sure your account is active.');
         } else {
@@ -310,6 +345,25 @@ const Login = () => {
                   Bypasses login for testing
                 </Text>
               </View>
+
+              {/* Reset Database Button - Added at the bottom */}
+              <View className="mt-6 border-t border-gray-300 pt-6">
+                <Text className="text-gray-700 font-semibold mb-3 text-center">
+                  Database Tools
+                </Text>
+                <TouchableOpacity
+                  className="bg-red-500 rounded-lg py-3 mb-2"
+                  onPress={handleResetDatabase}
+                  disabled={isLoading}
+                >
+                  <Text className="text-white text-center font-semibold text-lg">
+                    Reset Database
+                  </Text>
+                </TouchableOpacity>
+                <Text className="text-gray-500 text-xs text-center">
+                  Use this if you encounter database errors
+                </Text>
+              </View>
             </View>
           </View>
         </TouchableWithoutFeedback>
@@ -342,6 +396,19 @@ const Login = () => {
             >
               <Text className="text-white font-semibold text-lg">Try Again</Text>
             </TouchableOpacity>
+
+            {/* Add Reset Database option to error modal if it's a database error */}
+            {errorMessage.includes('database') && (
+              <TouchableOpacity
+                className="bg-red-500 rounded-lg py-3 px-4 mt-2 items-center"
+                onPress={() => {
+                  setShowErrorModal(false);
+                  handleResetDatabase();
+                }}
+              >
+                <Text className="text-white font-semibold text-lg">Reset Database</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </Modal>

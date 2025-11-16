@@ -6,14 +6,14 @@ export const restockService = {
   isRestockEnabled: async (): Promise<boolean> => {
     try {
       const config = await configService.getConfiguration();
-      return config.restockEnabled !== false; // Default to true if not set
+      return config.restockEnabled !== false;
     } catch (error) {
       console.error('Error checking restock configuration:', error);
-      return true; // Default to enabled if error
+      return true;
     }
   },
 
-  // Get current stock data from database - ONLY ENABLED ITEMS
+  // Get current stock data from database - ONLY ENABLED ITEMS - UPDATED: Include sold data
   getCurrentStock: async () => {
     try {
       const items = await itemService.getItems();
@@ -24,6 +24,7 @@ export const restockService = {
           label: item.label,
           image: getImageByKey(item.image_key),
           stock: item.stock || 0,
+          sold: item.sold || 0, // ADDED: Sold tracking
           lowStockThreshold: item.low_stock_threshold || 5,
           reserved: item.reserved || 0,
           rejected: item.rejected || 0,
