@@ -1,4 +1,5 @@
 // app/(user)/(tabs)/shop.tsx
+import Loading from "@/app/components/Loading";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -402,14 +403,19 @@ const Shop = () => {
     }
   };
 
-  // Add empty state handling
-  if (isLoading) {
-    return (
-      <View className="flex-1 bg-neutral-50 justify-center items-center">
-        <Text className="text-lg text-neutral-600">Loading shop data...</Text>
-      </View>
-    );
-  }
+  // empty state handling
+    if (isLoading) {
+      return (
+        <Loading 
+          message="Loading shop data..."
+          type="pulse"
+          fullScreen={true}
+          showHeader={true}
+          headerTitle="Shop"
+          headerUser={currentUser}
+        />
+      );
+    }
 
   if (!configuration.shopEnabled) {
     return (

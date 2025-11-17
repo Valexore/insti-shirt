@@ -1,4 +1,5 @@
 // app/(restock)/restock_config.tsx
+import Loading from "@/app/components/Loading";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -420,9 +421,10 @@ const RestockConfig = () => {
     return (
       <SafeAreaView className="flex-1 bg-neutral-50" edges={['left', 'right']}>
         <RestockHeader onBack={handleBack} currentUser={currentUser} />
-        <View className="flex-1 justify-center items-center">
-          <Text className="text-lg text-gray-700">Loading restock data...</Text>
-        </View>
+        <Loading 
+          message="Loading restock data..."
+          type="spinner"
+        />
       </SafeAreaView>
     );
   }

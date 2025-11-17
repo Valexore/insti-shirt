@@ -1,4 +1,5 @@
 // app/(user)/(tabs)/restock.tsx
+import Loading from "@/app/components/Loading";
 import { router, useLocalSearchParams } from "expo-router";
 import { Info, Package } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
@@ -12,7 +13,6 @@ import {
 } from "react-native";
 import { restockService } from "../../../services/restockService";
 import Modal from "../../components/Modal";
-
 interface StockItem {
   key: string;
   label: string;
@@ -201,13 +201,29 @@ const Restock = () => {
     </View>
   );
 
-  if (isLoading) {
-    return (
-      <View className="flex-1 bg-neutral-50 justify-center items-center">
-        <Text className="text-lg text-gray-700">Loading stock data...</Text>
+if (isLoading) {
+  return (
+    <View className="flex-1 bg-neutral-50">
+      {/* Header */}
+      <View className="bg-primary p-4">
+        <Text className="text-white text-xl font-bold text-center">
+          Stock Management
+        </Text>
+        {currentUser && (
+          <Text className="text-accent-100 text-sm text-center mt-1">
+            Welcome, {currentUser.name}
+          </Text>
+        )}
       </View>
-    );
-  }
+      
+      <Loading 
+        message="Loading stock data..."
+        type="pulse"
+        backgroundColor="bg-neutral-50"
+      />
+    </View>
+  );
+}
 
   // Show disabled state if restock is not enabled
   if (!isRestockEnabled) {

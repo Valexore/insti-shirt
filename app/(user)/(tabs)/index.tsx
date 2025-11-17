@@ -1,4 +1,5 @@
 // app/(user)/(tabs)/index.tsx
+import Loading from '@/app/components/Loading';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronRight, LogOut, Package, ShoppingCart, TrendingUp, User } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
@@ -386,14 +387,15 @@ const loadRecentActivities = async () => {
     });
   };
 
-  if (isLoading) {
-    return (
-      <View className="flex-1 bg-neutral-50 justify-center items-center">
-        <Text className="text-lg text-gray-700">Loading dashboard...</Text>
-        <Text className="text-sm text-gray-500 mt-2">Please wait</Text>
-      </View>
-    );
-  }
+    if (isLoading) {
+      return (
+        <Loading 
+          message="Loading dashboard..."
+          type="spinner"
+          fullScreen={true}
+        />
+      );
+    }
 
   const mostCriticalItem = getMostCriticalLowStockItem();
 
