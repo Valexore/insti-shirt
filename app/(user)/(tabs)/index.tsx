@@ -1,7 +1,7 @@
 // app/(user)/(tabs)/index.tsx
 import Loading from '@/app/components/Loading';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronRight, LogOut, Package, ShoppingCart, TrendingUp, User } from 'lucide-react-native';
+import { ChevronRight, Filter, LogOut, Package, ShoppingCart, TrendingUp, User } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
@@ -44,7 +44,13 @@ interface RecentActivity {
   description: string;
   timestamp: string;
   amount?: number;
-  items?: string; // Changed to string since we're using join(', ')
+  items?: string;
+}
+
+interface ActivityFilters {
+  timeRange: 'all' | 'today' | 'week' | 'month';
+  type: 'all' | 'sale' | 'restock' | 'login' | 'rejected' | 'returned';
+  size: 'all' | string;
 }
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -70,8 +76,17 @@ const UserIndex = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Filter states
+  const [activityFilters, setActivityFilters] = useState<ActivityFilters>({
+    timeRange: 'all',
+    type: 'all',
+    size: 'all'
+  });
+  const [availableSizes, setAvailableSizes] = useState<string[]>([]);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+
   // Calculate responsive values
-  const cardWidth = (screenWidth - 48) / 2; // 48 = 32px padding + 16px gap
+  const cardWidth = (screenWidth - 48) / 2;
   const isSmallScreen = screenWidth < 375;
 
   // Parse user data from params (only once on mount)
@@ -140,6 +155,21 @@ const UserIndex = () => {
         
         setLowStockItems(lowStock);
 
+        // Load sizes from current inventory for filters
+        const sizes = new Set<string>();
+        enabledItems.forEach(item => {
+          if (item.key) {
+            // Convert size keys to display format (XS, S, M, L, XL, XXL, XXXL)
+            const sizeDisplay = getSizeDisplayName(item.key);
+            sizes.add(sizeDisplay);
+          }
+        });
+        setAvailableSizes(Array.from(sizes).sort((a, b) => {
+          // Sort sizes in logical order
+          const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+          return sizeOrder.indexOf(a) - sizeOrder.indexOf(b);
+        }));
+
         // Load recent activities for current cashier
         await loadRecentActivities();
       } catch (error) {
@@ -184,38 +214,69 @@ const UserIndex = () => {
     return () => clearTimeout(timer);
   }, [currentUser]);
 
-const loadRecentActivities = async () => {
-  if (!currentUser) {
-    console.log('No current user found');
-    return;
-  }
+  const loadRecentActivities = async () => {
+    if (!currentUser) {
+      console.log('No current user found');
+      return;
+    }
 
-  try {
-    console.log('Loading activities for user:', currentUser.id);
-    
-    // Get real activities from database
-    const activities = await activityService.getUserActivities(currentUser.id, 5);
-    console.log('Raw activities from database:', activities);
-    
-    const formattedActivities: RecentActivity[] = activities.map(activity => ({
-      id: activity.id,
-      type: activity.type as 'sale' | 'restock' | 'login' | 'rejected' | 'returned',
-      description: activity.description,
-      timestamp: activity.timestamp,
-      amount: activity.amount || undefined,
-      items: activity.items || undefined
-    }));
+    try {
+      console.log('Loading activities for user:', currentUser.id);
+      
+      // Get limited activities for dashboard (5 items)
+      const recentActivitiesData = await activityService.getUserActivities(currentUser.id, 5);
+      console.log('Recent activities from database:', recentActivitiesData);
+      
+      const formattedRecentActivities: RecentActivity[] = recentActivitiesData.map(activity => ({
+        id: activity.id,
+        type: activity.type as 'sale' | 'restock' | 'login' | 'rejected' | 'returned',
+        description: activity.description,
+        timestamp: activity.timestamp,
+        amount: activity.amount || undefined,
+        items: activity.items || undefined,
+      }));
 
-    console.log('Formatted activities:', formattedActivities);
-    setRecentActivities(formattedActivities);
-    setAllActivities(formattedActivities);
-  } catch (error) {
-    console.error('Error loading recent activities:', error);
-    // Fallback to empty array
-    setRecentActivities([]);
-    setAllActivities([]);
-  }
-};
+      // Get ALL activities for the "View All" modal using the new method
+      const allActivitiesData = await activityService.getAllUserActivities(currentUser.id);
+      console.log('All activities from database:', allActivitiesData);
+      
+      const formattedAllActivities: RecentActivity[] = allActivitiesData.map(activity => ({
+        id: activity.id,
+        type: activity.type as 'sale' | 'restock' | 'login' | 'rejected' | 'returned',
+        description: activity.description,
+        timestamp: activity.timestamp,
+        amount: activity.amount || undefined,
+        items: activity.items || undefined,
+      }));
+
+      console.log('Formatted recent activities:', formattedRecentActivities);
+      console.log('Formatted all activities:', formattedAllActivities);
+      
+      setRecentActivities(formattedRecentActivities);
+      setAllActivities(formattedAllActivities);
+    } catch (error) {
+      console.error('Error loading recent activities:', error);
+      // Fallback: if getAllUserActivities doesn't exist, use the limited data for both
+      try {
+        const fallbackActivities = await activityService.getUserActivities(currentUser.id, 50);
+        const formattedFallback: RecentActivity[] = fallbackActivities.map(activity => ({
+          id: activity.id,
+          type: activity.type as 'sale' | 'restock' | 'login' | 'rejected' | 'returned',
+          description: activity.description,
+          timestamp: activity.timestamp,
+          amount: activity.amount || undefined,
+          items: activity.items || undefined,
+        }));
+
+        setRecentActivities(formattedFallback.slice(0, 5));
+        setAllActivities(formattedFallback);
+      } catch (fallbackError) {
+        console.error('Fallback also failed:', fallbackError);
+        setRecentActivities([]);
+        setAllActivities([]);
+      }
+    }
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -251,6 +312,19 @@ const loadRecentActivities = async () => {
           }));
         
         setLowStockItems(lowStock);
+
+        // Reload sizes from current inventory
+        const sizes = new Set<string>();
+        enabledItems.forEach(item => {
+          if (item.key) {
+            const sizeDisplay = getSizeDisplayName(item.key);
+            sizes.add(sizeDisplay);
+          }
+        });
+        setAvailableSizes(Array.from(sizes).sort((a, b) => {
+          const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+          return sizeOrder.indexOf(a) - sizeOrder.indexOf(b);
+        }));
 
         // Reload recent activities
         await loadRecentActivities();
@@ -376,6 +450,20 @@ const loadRecentActivities = async () => {
     return 'In Stock';
   };
 
+  // Helper function to convert size keys to display names
+  const getSizeDisplayName = (sizeKey: string): string => {
+    const sizeMap: { [key: string]: string } = {
+      'xs': 'XS',
+      'small': 'S',
+      'medium': 'M',
+      'large': 'L',
+      'xl': 'XL',
+      'xxl': 'XXL',
+      'xxxl': 'XXXL'
+    };
+    return sizeMap[sizeKey.toLowerCase()] || sizeKey.toUpperCase();
+  };
+
   // Get the most critical low stock item (lowest stock percentage)
   const getMostCriticalLowStockItem = () => {
     if (lowStockItems.length === 0) return null;
@@ -387,15 +475,200 @@ const loadRecentActivities = async () => {
     });
   };
 
-    if (isLoading) {
-      return (
-        <Loading 
-          message="Loading dashboard..."
-          type="spinner"
-          fullScreen={true}
-        />
-      );
-    }
+  // Filter activities based on current filters
+  const filterActivities = (activities: RecentActivity[]): RecentActivity[] => {
+    return activities.filter(activity => {
+      // Time range filter
+      if (activityFilters.timeRange !== 'all') {
+        const activityDate = new Date(activity.timestamp);
+        const now = new Date();
+        
+        switch (activityFilters.timeRange) {
+          case 'today':
+            const isToday = activityDate.toDateString() === now.toDateString();
+            if (!isToday) return false;
+            break;
+          case 'week':
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            if (activityDate < weekAgo) return false;
+            break;
+          case 'month':
+            const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            if (activityDate < monthAgo) return false;
+            break;
+        }
+      }
+
+      // Activity type filter
+      if (activityFilters.type !== 'all' && activity.type !== activityFilters.type) {
+        return false;
+      }
+
+      // Size filter - matches against size keys in activity items
+      if (activityFilters.size !== 'all') {
+        const sizeKey = activityFilters.size.toLowerCase();
+        if (!activity.items?.toLowerCase().includes(sizeKey)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  };
+
+  // Filter Modal Component
+  const FilterModal = () => (
+    <Modal
+      visible={showFilterModal}
+      onClose={() => setShowFilterModal(false)}
+      title="Filter Activities"
+    >
+      <View className="p-4">
+        {/* Header with Clear All */}
+        <View className="flex-row justify-between items-center mb-4">
+          <Text className="text-primary text-xl font-bold">Filter Activities</Text>
+          <TouchableOpacity 
+            onPress={() => setActivityFilters({
+              timeRange: 'all',
+              type: 'all',
+              size: 'all'
+            })}
+            className="bg-neutral-100 rounded-lg px-3 py-1"
+          >
+            <Text className="text-neutral-600 text-sm">Clear All</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Time Range Filter */}
+        <View className="mb-6">
+          <Text className="text-primary font-semibold text-lg mb-3">Time Range</Text>
+          <View className="flex-row flex-wrap">
+            {[
+              { key: 'all', label: 'All Time' },
+              { key: 'today', label: 'Today' },
+              { key: 'week', label: 'This Week' },
+              { key: 'month', label: 'This Month' }
+            ].map((time) => (
+              <TouchableOpacity
+                key={time.key}
+                onPress={() => setActivityFilters(prev => ({ ...prev, timeRange: time.key as any }))}
+                className={`mr-2 mb-2 px-4 py-2 rounded-full ${
+                  activityFilters.timeRange === time.key ? 'bg-primary' : 'bg-neutral-100'
+                }`}
+              >
+                <Text className={
+                  activityFilters.timeRange === time.key ? 'text-white font-medium' : 'text-neutral-600'
+                }>
+                  {time.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Activity Type Filter */}
+        <View className="mb-6">
+          <Text className="text-primary font-semibold text-lg mb-3">Activity Type</Text>
+          <View className="flex-row flex-wrap">
+            {[
+              { key: 'all', label: 'All Types' },
+              { key: 'sale', label: 'Sales', emoji: '💰' },
+              { key: 'restock', label: 'Restocks', emoji: '📦' },
+              { key: 'login', label: 'Logins', emoji: '🔐' },
+              { key: 'rejected', label: 'Rejected', emoji: '❌' },
+              { key: 'returned', label: 'Returned', emoji: '🔄' }
+            ].map((type) => (
+              <TouchableOpacity
+                key={type.key}
+                onPress={() => setActivityFilters(prev => ({ ...prev, type: type.key as any }))}
+                className={`mr-2 mb-2 px-4 py-2 rounded-full ${
+                  activityFilters.type === type.key ? 'bg-secondary' : 'bg-neutral-100'
+                }`}
+              >
+                <Text className={
+                  activityFilters.type === type.key ? 'text-white font-medium' : 'text-neutral-600'
+                }>
+                  {type.emoji && <Text>{type.emoji} </Text>}
+                  {type.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Size Filter */}
+        {availableSizes.length > 0 && (
+          <View className="mb-6">
+            <Text className="text-primary font-semibold text-lg mb-3">Size</Text>
+            <Text className="text-neutral-500 text-sm mb-2">
+              Filter by shirt sizes currently in your inventory
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-2">
+              <View className="flex-row">
+                <TouchableOpacity
+                  onPress={() => setActivityFilters(prev => ({ ...prev, size: 'all' }))}
+                  className={`mr-2 px-4 py-2 rounded-full ${
+                    activityFilters.size === 'all' ? 'bg-success' : 'bg-neutral-100'
+                  }`}
+                >
+                  <Text className={
+                    activityFilters.size === 'all' ? 'text-white font-medium' : 'text-neutral-600'
+                  }>
+                    All Sizes
+                  </Text>
+                </TouchableOpacity>
+                {availableSizes.map((size) => (
+                  <TouchableOpacity
+                    key={size}
+                    onPress={() => setActivityFilters(prev => ({ ...prev, size }))}
+                    className={`mr-2 px-4 py-2 rounded-full ${
+                      activityFilters.size === size ? 'bg-success' : 'bg-neutral-100'
+                    }`}
+                  >
+                    <Text className={
+                      activityFilters.size === size ? 'text-white font-medium' : 'text-neutral-600'
+                    }>
+                      {size}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Action Buttons */}
+        <View className="flex-row space-x-3 mt-4">
+          <TouchableOpacity
+            onPress={() => setActivityFilters({
+              timeRange: 'all',
+              type: 'all',
+              size: 'all'
+            })}
+            className="flex-1 bg-neutral-200 rounded-lg py-3 px-4"
+          >
+            <Text className="text-neutral-600 font-semibold text-center">Reset</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setShowFilterModal(false)}
+            className="flex-1 bg-primary rounded-lg py-3 px-4"
+          >
+            <Text className="text-white font-semibold text-center">Apply Filters</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  if (isLoading) {
+    return (
+      <Loading 
+        message="Loading dashboard..."
+        type="spinner"
+        fullScreen={true}
+      />
+    );
+  }
 
   const mostCriticalItem = getMostCriticalLowStockItem();
 
@@ -692,51 +965,122 @@ const loadRecentActivities = async () => {
         )}
       </ScrollView>
 
-      {/* All Activities Modal */}
+      {/* All Activities Modal with Filters */}
       <Modal
         visible={showAllActivitiesModal}
-        onClose={() => setShowAllActivitiesModal(false)}
+        onClose={() => {
+          setShowAllActivitiesModal(false);
+          // Reset filters when closing modal
+          setActivityFilters({
+            timeRange: 'all',
+            type: 'all',
+            size: 'all'
+          });
+        }}
         title="All Activities"
       >
-        <View className="p-4">
-          {allActivities.map((activity) => (
-            <View 
-              key={activity.id}
-              className="flex-row items-start p-3 border-b border-accent-100"
-            >
-              <View className="bg-primary/10 rounded-full p-2 mr-3 mt-1">
-                <Text className="text-sm">{getActivityIcon(activity.type)}</Text>
-              </View>
+        <View className="flex-1">
+          {/* Filter Header */}
+          <View className="bg-white border-b border-accent-100 p-4">
+            <View className="flex-row justify-between items-center mb-2">
+              <Text className="text-primary font-semibold text-lg">
+                Activity History
+              </Text>
+              <TouchableOpacity 
+                onPress={() => setShowFilterModal(true)}
+                className="flex-row items-center bg-primary/10 rounded-lg px-3 py-2"
+              >
+                <Filter size={16} color="#3B82F6" />
+                <Text className="text-primary font-medium mr-2 ml-1">Filter</Text>
+                <Text className="bg-primary text-white rounded-full w-5 h-5 text-xs text-center">
+                  {(() => {
+                    let count = 0;
+                    if (activityFilters.timeRange !== 'all') count++;
+                    if (activityFilters.type !== 'all') count++;
+                    if (activityFilters.size !== 'all') count++;
+                    return count;
+                  })()}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            
+            {/* Active Filters Display */}
+            <View className="flex-row flex-wrap">
+              {activityFilters.timeRange !== 'all' && (
+                <View className="bg-primary/20 rounded-full px-2 py-1 mr-2 mb-1">
+                  <Text className="text-primary text-xs">
+                    {activityFilters.timeRange.charAt(0).toUpperCase() + activityFilters.timeRange.slice(1)}
+                  </Text>
+                </View>
+              )}
+              {activityFilters.type !== 'all' && (
+                <View className="bg-secondary/20 rounded-full px-2 py-1 mr-2 mb-1">
+                  <Text className="text-secondary text-xs">
+                    {activityFilters.type.charAt(0).toUpperCase() + activityFilters.type.slice(1)}
+                  </Text>
+                </View>
+              )}
+              {activityFilters.size !== 'all' && (
+                <View className="bg-success/20 rounded-full px-2 py-1 mr-2 mb-1">
+                  <Text className="text-success text-xs">
+                    Size: {activityFilters.size}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Activities List */}
+          <ScrollView className="flex-1">
+            <View className="p-4">
+              {filterActivities(allActivities).map((activity) => (
+                <View 
+                  key={activity.id}
+                  className="flex-row items-start p-3 border-b border-accent-100"
+                >
+                  <View className="bg-primary/10 rounded-full p-2 mr-3 mt-1">
+                    <Text className="text-sm">{getActivityIcon(activity.type)}</Text>
+                  </View>
+                  
+                  <View className="flex-1">
+                    <Text className="text-primary font-medium text-base">
+                      {activity.description}
+                    </Text>
+                    {activity.amount && (
+                      <Text className="text-success text-sm font-medium mt-1">
+                        Amount: {formatCurrency(activity.amount)}
+                      </Text>
+                    )}
+                    {activity.items && (
+                      <Text className="text-neutral-500 text-sm mt-1">
+                        Items: {activity.items}
+                      </Text>
+                    )}
+                    <Text className="text-neutral-400 text-xs mt-2">
+                      {formatDateTime(activity.timestamp)}
+                    </Text>
+                  </View>
+                </View>
+              ))}
               
-              <View className="flex-1">
-                <Text className="text-primary font-medium text-base">
-                  {activity.description}
-                </Text>
-                {activity.amount && (
-                  <Text className="text-success text-sm font-medium mt-1">
-                    Amount: {formatCurrency(activity.amount)}
+              {filterActivities(allActivities).length === 0 && (
+                <View className="items-center py-8">
+                  <Text className="text-neutral-500 text-lg">No activities found</Text>
+                  <Text className="text-neutral-400 text-sm mt-2">
+                    {allActivities.length === 0 
+                      ? "Your activities will appear here" 
+                      : "No activities match your current filters"
+                    }
                   </Text>
-                )}
-                {activity.items && (
-                  <Text className="text-neutral-500 text-sm mt-1">
-                    Items: {activity.items}
-                  </Text>
-                )}
-                <Text className="text-neutral-400 text-xs mt-2">
-                  {formatDateTime(activity.timestamp)}
-                </Text>
-              </View>
+                </View>
+              )}
             </View>
-          ))}
-          
-          {allActivities.length === 0 && (
-            <View className="items-center py-8">
-              <Text className="text-neutral-500 text-lg">No activities found</Text>
-              <Text className="text-neutral-400 text-sm mt-2">Your activities will appear here</Text>
-            </View>
-          )}
+          </ScrollView>
         </View>
       </Modal>
+
+      {/* Filter Modal */}
+      <FilterModal />
     </View>
   );
 };

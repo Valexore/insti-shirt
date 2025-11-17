@@ -282,7 +282,7 @@ const Shop = () => {
         
         // Navigate to reservation screen
         router.push({
-          pathname: "../(shop)/reserve_information",
+          pathname: "/reserve_information",
           params: {
             quantities: JSON.stringify(currentQuantities),
             user: JSON.stringify(currentUser),
@@ -302,7 +302,7 @@ const Shop = () => {
         
         // Navigate to sale information screen
         router.push({
-          pathname: "../(shop)/information",
+          pathname: "/information",
           params: {
             quantities: JSON.stringify(currentQuantities),
             user: JSON.stringify(currentUser),
@@ -320,7 +320,7 @@ const Shop = () => {
     } else if (activeTab === "rejected") {
       // Process rejected items
       router.push({
-        pathname: "../(shop)/rejected_confirmation",
+        pathname: "/rejected_confirmation",
         params: {
           rejectedQuantities: JSON.stringify(currentQuantities),
           user: JSON.stringify(currentUser),
@@ -339,7 +339,7 @@ const Shop = () => {
       
       // Process returned items
       router.push({
-        pathname: "../(shop)/returned_confirmation",
+        pathname: "/returned_confirmation",
         params: {
           returnedQuantities: JSON.stringify(currentQuantities),
           user: JSON.stringify(currentUser),

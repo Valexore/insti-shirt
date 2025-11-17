@@ -136,7 +136,7 @@ const Restock = () => {
     }
 
     router.push({
-      pathname: '../(restock)/restock_config',
+      pathname: '/restock_config',
       params: { user: JSON.stringify(currentUser) }
     });
   };

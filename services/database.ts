@@ -78,6 +78,7 @@ interface Activity {
   timestamp: string;
   created_at: string;
   user_name?: string;
+   itemKeys?: string[];
 }
 
 // Type for SQLite result
@@ -894,7 +895,7 @@ export const activityService = {
     });
   },
 
-  // Get activities for a specific user
+  // Get activities for a specific user with limit
   getUserActivities: (userId: number, limit?: number): Promise<Activity[]> => {
     return new Promise((resolve, reject) => {
       try {
@@ -911,6 +912,30 @@ export const activityService = {
         
         const params = limit ? [userId, limit] : [userId];
         const activities = db.getAllSync(query, params) as Activity[];
+        
+        // Parse items JSON if exists
+        const parsedActivities = activities.map(activity => ({
+          ...activity,
+          items: activity.items ? JSON.parse(activity.items) : undefined
+        }));
+        
+        resolve(parsedActivities);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  },
+
+  // NEW METHOD: Get all activities for a specific user without limit
+  getAllUserActivities: (userId: number): Promise<Activity[]> => {
+    return new Promise((resolve, reject) => {
+      try {
+        const query = `SELECT a.*, u.name as user_name FROM activities a 
+                      LEFT JOIN users u ON a.user_id = u.id 
+                      WHERE a.user_id = ? 
+                      ORDER BY a.timestamp DESC`;
+        
+        const activities = db.getAllSync(query, [userId]) as Activity[];
         
         // Parse items JSON if exists
         const parsedActivities = activities.map(activity => ({
