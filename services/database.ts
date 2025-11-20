@@ -1,3 +1,4 @@
+// services/database.ts
 import * as SQLite from 'expo-sqlite';
 
 // Define TypeScript interfaces for our database entities
@@ -78,7 +79,7 @@ interface Activity {
   timestamp: string;
   created_at: string;
   user_name?: string;
-   itemKeys?: string[];
+  itemKeys?: string[];
 }
 
 // Type for SQLite result
@@ -175,7 +176,7 @@ export const initDatabase = (): Promise<void> => {
         );
       `);
 
-      // Activities table
+      // Activities table - FIXED: Ensure proper structure for activity tracking
       db.execSync(`
         CREATE TABLE IF NOT EXISTS activities (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -186,7 +187,7 @@ export const initDatabase = (): Promise<void> => {
           items TEXT,
           timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (user_id) REFERENCES users (id)
+          FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
         );
       `);
 
@@ -273,9 +274,50 @@ export const initDatabase = (): Promise<void> => {
           console.log('Default items inserted for first-time setup');
         } else {
           console.log('Items table already has data, skipping default items insertion');
+          
+          // FIX: Ensure sold column exists in existing tables
+          try {
+            // Check if sold column exists
+            const tableInfo = db.getAllSync('PRAGMA table_info(items)') as any[];
+            const hasSoldColumn = tableInfo.some(column => column.name === 'sold');
+            
+            if (!hasSoldColumn) {
+              console.log('Adding sold column to items table...');
+              db.execSync('ALTER TABLE items ADD COLUMN sold INTEGER DEFAULT 0');
+              console.log('Sold column added successfully');
+            }
+          } catch (alterError) {
+            console.log('Sold column already exists or could not be added:', alterError);
+          }
         }
       } catch (error) {
         console.error('Error checking/inserting default items:', error);
+      }
+
+      // Insert default configuration if not exists
+      try {
+        const existingConfig = db.getAllSync('SELECT * FROM configuration') as Configuration[];
+        if (existingConfig.length === 0) {
+          const defaultConfig = [
+            { feature_key: 'shopEnabled', feature_value: 'true', feature_type: 'boolean' },
+            { feature_key: 'allowDirectQuantityInput', feature_value: 'true', feature_type: 'boolean' },
+            { feature_key: 'showStockLevels', feature_value: 'true', feature_type: 'boolean' },
+            { feature_key: 'lowStockWarnings', feature_value: 'true', feature_type: 'boolean' },
+            { feature_key: 'reservationEnabled', feature_value: 'true', feature_type: 'boolean' },
+            { feature_key: 'returnsEnabled', feature_value: 'true', feature_type: 'boolean' },
+            { feature_key: 'restockEnabled', feature_value: 'true', feature_type: 'boolean' },
+          ];
+
+          defaultConfig.forEach(config => {
+            db.runSync(
+              `INSERT INTO configuration (feature_key, feature_value, feature_type) VALUES (?, ?, ?)`,
+              [config.feature_key, config.feature_value, config.feature_type]
+            );
+          });
+          console.log('Default configuration inserted');
+        }
+      } catch (error) {
+        console.log('Configuration already exists or error inserting:', error);
       }
 
       console.log('Database initialized successfully');
@@ -304,6 +346,15 @@ export const userService = {
             'UPDATE users SET last_active = datetime("now") WHERE id = ?',
             [user.id]
           );
+          
+          // Log login activity
+          activityService.createActivity({
+            user_id: user.id,
+            type: 'login',
+            description: 'User logged in',
+            timestamp: new Date().toISOString()
+          }).catch(err => console.error('Error logging login activity:', err));
+          
           resolve(user);
         } else {
           reject(new Error('Invalid credentials or inactive account'));
@@ -858,12 +909,18 @@ export const reportService = {
   }
 };
 
-// Activity operations
+// Activity operations - FIXED: Improved activity tracking
 export const activityService = {
-  // Create new activity
+  // Create new activity - FIXED: Better error handling and item serialization
   createActivity: (activityData: Omit<Activity, 'id' | 'created_at' | 'user_name'>): Promise<Activity> => {
     return new Promise((resolve, reject) => {
       try {
+        // Validate required fields
+        if (!activityData.user_id || !activityData.type || !activityData.description) {
+          reject(new Error('Missing required activity fields: user_id, type, description'));
+          return;
+        }
+
         const result = db.runSync(
           `INSERT INTO activities (user_id, type, description, amount, items, timestamp) 
            VALUES (?, ?, ?, ?, ?, ?)`,
@@ -872,7 +929,7 @@ export const activityService = {
             activityData.type,
             activityData.description,
             activityData.amount || 0,
-            activityData.items ? JSON.stringify(activityData.items) : null,
+            activityData.items ? activityData.items : null, // FIX: Don't double-stringify
             activityData.timestamp || new Date().toISOString()
           ]
         ) as SQLiteResult;
@@ -888,14 +945,21 @@ export const activityService = {
           created_at: new Date().toISOString()
         };
 
+        console.log('Activity created successfully:', {
+          id: newActivity.id,
+          type: newActivity.type,
+          description: newActivity.description
+        });
+
         resolve(newActivity);
       } catch (error) {
+        console.error('Error creating activity:', error);
         reject(error);
       }
     });
   },
 
-  // Get activities for a specific user with limit
+  // Get activities for a specific user with limit - FIXED: Proper item parsing
   getUserActivities: (userId: number, limit?: number): Promise<Activity[]> => {
     return new Promise((resolve, reject) => {
       try {
@@ -913,11 +977,27 @@ export const activityService = {
         const params = limit ? [userId, limit] : [userId];
         const activities = db.getAllSync(query, params) as Activity[];
         
-        // Parse items JSON if exists
-        const parsedActivities = activities.map(activity => ({
-          ...activity,
-          items: activity.items ? JSON.parse(activity.items) : undefined
-        }));
+        // FIX: Only parse items if they exist and are valid JSON
+        const parsedActivities = activities.map(activity => {
+          let parsedItems = activity.items;
+          if (activity.items && activity.items.trim() !== '') {
+            try {
+              // Check if it's already a string (not JSON)
+              if (activity.items.startsWith('{') || activity.items.startsWith('[')) {
+                parsedItems = JSON.parse(activity.items);
+              }
+              // Otherwise, keep it as is (already a string)
+            } catch (parseError) {
+              console.warn('Failed to parse activity items, keeping as string:', activity.items);
+              // Keep original items string if parsing fails
+            }
+          }
+          
+          return {
+            ...activity,
+            items: parsedItems
+          };
+        });
         
         resolve(parsedActivities);
       } catch (error) {
@@ -937,11 +1017,27 @@ export const activityService = {
         
         const activities = db.getAllSync(query, [userId]) as Activity[];
         
-        // Parse items JSON if exists
-        const parsedActivities = activities.map(activity => ({
-          ...activity,
-          items: activity.items ? JSON.parse(activity.items) : undefined
-        }));
+        // FIX: Only parse items if they exist and are valid JSON
+        const parsedActivities = activities.map(activity => {
+          let parsedItems = activity.items;
+          if (activity.items && activity.items.trim() !== '') {
+            try {
+              // Check if it's already a string (not JSON)
+              if (activity.items.startsWith('{') || activity.items.startsWith('[')) {
+                parsedItems = JSON.parse(activity.items);
+              }
+              // Otherwise, keep it as is (already a string)
+            } catch (parseError) {
+              console.warn('Failed to parse activity items, keeping as string:', activity.items);
+              // Keep original items string if parsing fails
+            }
+          }
+          
+          return {
+            ...activity,
+            items: parsedItems
+          };
+        });
         
         resolve(parsedActivities);
       } catch (error) {
@@ -966,11 +1062,27 @@ export const activityService = {
         const params = limit ? [limit] : [];
         const activities = db.getAllSync(query, params) as Activity[];
         
-        // Parse items JSON if exists
-        const parsedActivities = activities.map(activity => ({
-          ...activity,
-          items: activity.items ? JSON.parse(activity.items) : undefined
-        }));
+        // FIX: Only parse items if they exist and are valid JSON
+        const parsedActivities = activities.map(activity => {
+          let parsedItems = activity.items;
+          if (activity.items && activity.items.trim() !== '') {
+            try {
+              // Check if it's already a string (not JSON)
+              if (activity.items.startsWith('{') || activity.items.startsWith('[')) {
+                parsedItems = JSON.parse(activity.items);
+              }
+              // Otherwise, keep it as is (already a string)
+            } catch (parseError) {
+              console.warn('Failed to parse activity items, keeping as string:', activity.items);
+              // Keep original items string if parsing fails
+            }
+          }
+          
+          return {
+            ...activity,
+            items: parsedItems
+          };
+        });
         
         resolve(parsedActivities);
       } catch (error) {
@@ -996,11 +1108,27 @@ export const activityService = {
         const params = userId ? [userId] : [];
         const activities = db.getAllSync(query, params) as Activity[];
         
-        // Parse items JSON if exists
-        const parsedActivities = activities.map(activity => ({
-          ...activity,
-          items: activity.items ? JSON.parse(activity.items) : undefined
-        }));
+        // FIX: Only parse items if they exist and are valid JSON
+        const parsedActivities = activities.map(activity => {
+          let parsedItems = activity.items;
+          if (activity.items && activity.items.trim() !== '') {
+            try {
+              // Check if it's already a string (not JSON)
+              if (activity.items.startsWith('{') || activity.items.startsWith('[')) {
+                parsedItems = JSON.parse(activity.items);
+              }
+              // Otherwise, keep it as is (already a string)
+            } catch (parseError) {
+              console.warn('Failed to parse activity items, keeping as string:', activity.items);
+              // Keep original items string if parsing fails
+            }
+          }
+          
+          return {
+            ...activity,
+            items: parsedItems
+          };
+        });
         
         resolve(parsedActivities);
       } catch (error) {

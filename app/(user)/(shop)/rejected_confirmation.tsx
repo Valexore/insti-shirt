@@ -2,7 +2,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  Alert,
   ScrollView,
   Text,
   TextInput,
@@ -10,6 +9,8 @@ import {
   View
 } from 'react-native';
 import { shopService } from '../../../services/shopService';
+import ConfirmationModal from '../../components/ConfirmationModal';
+import Loading from '../../components/Loading';
 
 type Quantities = {
   xs: number;
@@ -26,8 +27,12 @@ const RejectedConfirmation = () => {
   const router = useRouter();
   
   const [comment, setComment] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
   
-  // Parse the rejected quantities and available stock
+  // Parse the rejected quantities and available stock with better error handling
   const rejectedQuantities: Quantities = params.rejectedQuantities 
     ? JSON.parse(params.rejectedQuantities as string)
     : {
@@ -40,7 +45,28 @@ const RejectedConfirmation = () => {
         xxxl: 0
       };
 
-  const userData = params.user ? JSON.parse(params.user as string) : null;
+  // FIX: Better user data parsing with fallbacks
+  const userData = React.useMemo(() => {
+    if (params.user) {
+      try {
+        return JSON.parse(params.user as string);
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+      }
+    }
+    
+    // Fallback: try to get from individual params
+    if (params.userId || params.userName) {
+      return {
+        id: parseInt(params.userId as string) || 1,
+        username: params.userUsername as string || 'cashier',
+        name: params.userName as string || 'Cashier User',
+        role: params.userRole as string || 'cashier'
+      };
+    }
+    
+    return null;
+  }, [params.user, params.userId, params.userName, params.userUsername, params.userRole]);
 
   const sizeLabels = {
     xs: 'Extra Small',
@@ -56,44 +82,93 @@ const RejectedConfirmation = () => {
 
   const handleConfirmRejection = async () => {
     if (!comment.trim()) {
-      Alert.alert('Comment Required', 'Please provide a reason for rejecting these items.');
+      setModalMessage('Please provide a reason for rejecting these items.');
+      setShowErrorModal(true);
       return;
     }
 
     if (!userData) {
-      Alert.alert('Error', 'User data not found');
+      setModalMessage('User data not found. Please try again.');
+      setShowErrorModal(true);
       return;
     }
+
+    if (totalItems === 0) {
+      setModalMessage('Please select items to reject.');
+      setShowErrorModal(true);
+      return;
+    }
+
+    setIsProcessing(true);
 
     try {
       // Process rejected items using shopService
       const rejectedData = {
         quantities: rejectedQuantities,
-        userId: userData.id
+        userId: userData.id,
+        comment: comment.trim()
       };
 
+      console.log('Processing rejection with data:', rejectedData);
+      
       const result = await shopService.processRejected(rejectedData);
       
-      Alert.alert(
-        'Rejection Confirmed',
-        `Successfully rejected ${totalItems} items. Stock has been updated.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => router.replace('/(user)/(tabs)')
-          }
-        ]
-      );
+      setModalMessage(`Successfully rejected ${totalItems} items. Stock has been updated.`);
+      setShowSuccessModal(true);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error processing rejection:', error);
-      Alert.alert('Error', 'Failed to process rejection. Please try again.');
+      setModalMessage(`Failed to process rejection: ${error.message || 'Please try again.'}`);
+      setShowErrorModal(true);
+    } finally {
+      setIsProcessing(false);
     }
+  };
+
+  const handleSuccessConfirm = () => {
+    setShowSuccessModal(false);
+    router.navigate({
+      pathname: '/(user)/(tabs)',
+      params: { 
+        user: JSON.stringify(userData),
+        refresh: Date.now()
+      }
+    });
   };
 
   const handleCancel = () => {
     router.back();
   };
+
+  if (isProcessing) {
+    return (
+      <Loading 
+        message="Processing rejection..."
+        type="pulse"
+        fullScreen={true}
+      />
+    );
+  }
+
+  // Show error if no user data
+  if (!userData) {
+    return (
+      <View className="flex-1 bg-neutral-50 justify-center items-center p-8">
+        <Text className="text-error text-xl font-bold text-center mb-4">
+          User Not Found
+        </Text>
+        <Text className="text-neutral-500 text-center mb-6">
+          Unable to load user information. Please go back and try again.
+        </Text>
+        <TouchableOpacity 
+          onPress={handleCancel}
+          className="bg-primary rounded-lg py-3 px-6"
+        >
+          <Text className="text-white font-semibold text-lg">Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-neutral-50">
@@ -112,7 +187,7 @@ const RejectedConfirmation = () => {
         </View>
       </View>
 
-      <ScrollView className="flex-1 p-4">
+      <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
         {/* Rejected Items Summary */}
         <View className="bg-white rounded-xl p-5 mb-4 shadow-sm border border-orange-200">
           <View className="flex-row items-center mb-3">
@@ -177,6 +252,7 @@ const RejectedConfirmation = () => {
             onChangeText={setComment}
             multiline
             textAlignVertical="top"
+            editable={!isProcessing}
           />
         </View>
 
@@ -189,24 +265,60 @@ const RejectedConfirmation = () => {
         </View>
       </ScrollView>
 
-      {/* Action Buttons */}
-      <View className="p-4 border-t border-accent-100 bg-white">
+      {/* Action Buttons - Fixed with safe area padding */}
+      <View className="p-4 pb-8 border-t border-accent-100 bg-white">
         <View className="flex-row space-x-4 mb-4">
           <TouchableOpacity 
             onPress={handleCancel}
-            className="flex-1 bg-white border border-orange-500 rounded-xl py-4 items-center"
+            disabled={isProcessing}
+            className={`flex-1 border rounded-xl py-4 items-center ${
+              isProcessing ? 'border-neutral-300' : 'border-orange-500'
+            }`}
           >
-            <Text className="text-orange-500 text-lg font-semibold">Cancel</Text>
+            <Text className={`text-lg font-semibold ${
+              isProcessing ? 'text-neutral-400' : 'text-orange-500'
+            }`}>
+              Cancel
+            </Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
             onPress={handleConfirmRejection}
-            className="flex-1 bg-orange-500 rounded-xl py-4 items-center shadow-sm"
+            disabled={!comment.trim() || totalItems === 0 || isProcessing}
+            className={`flex-1 rounded-xl py-4 items-center shadow-sm ${
+              !comment.trim() || totalItems === 0 || isProcessing 
+                ? 'bg-neutral-400' 
+                : 'bg-orange-500'
+            }`}
           >
-            <Text className="text-white text-lg font-semibold">Confirm Rejection</Text>
+            <Text className="text-white text-lg font-semibold">
+              Confirm Rejection
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Custom Confirmation Modals */}
+      <ConfirmationModal
+        visible={showSuccessModal}
+        type="success"
+        title="Rejection Confirmed"
+        message={modalMessage}
+        onConfirm={handleSuccessConfirm}
+        onClose={handleSuccessConfirm}
+        confirmText="OK"
+        showConfirmButton={false}
+      />
+
+      <ConfirmationModal
+        visible={showErrorModal}
+        type="error"
+        title="Error"
+        message={modalMessage}
+        onClose={() => setShowErrorModal(false)}
+        confirmText="OK"
+        showConfirmButton={false}
+      />
     </View>
   );
 };

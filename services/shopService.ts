@@ -7,11 +7,15 @@ interface SaleData {
   customerInfo: any;
   userId: number;
   totalAmount: number;
+  itemId?: string;
+  itemName?: string;
+  itemPrice?: number;
 }
 
 interface RejectedData {
   quantities: Record<string, number>;
   userId: number;
+  comment?: string;
 }
 
 interface ReturnedData {
@@ -116,7 +120,7 @@ export const shopService = {
         await activityService.createActivity({
           user_id: userId,
           type: 'sale',
-          description: 'Completed sale transaction',
+          description: `Completed sale of ${totalItems} items`,
           amount: totalAmount,
           items: soldItems.join(', '),
           timestamp: new Date().toISOString()
@@ -130,17 +134,23 @@ export const shopService = {
     }
   },
 
-  // Process rejected items
+  // Process rejected items - FIXED: Improved error handling and activity logging
   processRejected: async (rejectedData: RejectedData) => {
     try {
-      const { quantities, userId } = rejectedData;
+      const { quantities, userId, comment } = rejectedData;
       const rejectedItems: string[] = [];
+      const totalRejected = Object.values(quantities).reduce((sum, qty) => sum + qty, 0);
+
+      // Validate input
+      if (totalRejected === 0) {
+        throw new Error('No items selected for rejection');
+      }
 
       // Update rejected count and stock for each item
       for (const [size, quantity] of Object.entries(quantities)) {
         if (quantity > 0) {
           const item = await itemService.getItemByKey(size);
-          if (item) {
+          if (item && item.enabled) {
             const newStock = Math.max(0, (item.stock || 0) - quantity);
             const newRejected = (item.rejected || 0) + quantity;
             
@@ -149,6 +159,8 @@ export const shopService = {
               rejected: newRejected
             });
             rejectedItems.push(`${size}: ${quantity}`);
+          } else {
+            console.warn(`Item ${size} not found or disabled`);
           }
         }
       }
@@ -156,27 +168,50 @@ export const shopService = {
       // Update user rejected statistics
       const user = await userService.getUserById(userId);
       if (user) {
-        const totalRejected = Object.values(quantities).reduce((sum, qty) => sum + qty, 0);
         await userService.updateUser(userId, {
           today_rejected: (user.today_rejected || 0) + totalRejected,
           total_rejected: (user.total_rejected || 0) + totalRejected,
           last_active: new Date().toISOString()
         });
 
-        // Log rejected activity
+        // FIX: Improved activity logging with proper description
+        const activityDescription = comment 
+          ? `Rejected ${totalRejected} items: ${comment}`
+          : `Rejected ${totalRejected} items`;
+
         await activityService.createActivity({
           user_id: userId,
           type: 'rejected',
-          description: 'Processed rejected items',
+          description: activityDescription,
           items: rejectedItems.join(', '),
           timestamp: new Date().toISOString()
         });
+
+        console.log('Rejection processed successfully:', {
+          userId,
+          totalRejected,
+          rejectedItems,
+          comment
+        });
+      } else {
+        throw new Error('User not found');
       }
       
-      return { success: true, message: 'Rejected items processed successfully' };
+      return { 
+        success: true, 
+        message: 'Rejected items processed successfully',
+        totalRejected,
+        rejectedItems 
+      };
     } catch (error) {
       console.error('Error processing rejected items:', error);
-      throw new Error('Failed to process rejected items');
+      
+      // FIX: Proper error handling for TypeScript
+      if (error instanceof Error) {
+        throw new Error(`Failed to process rejected items: ${error.message}`);
+      } else {
+        throw new Error('Failed to process rejected items: Unknown error occurred');
+      }
     }
   },
 
@@ -185,12 +220,13 @@ export const shopService = {
     try {
       const { quantities, userId } = returnedData;
       const returnedItems: string[] = [];
+      const totalReturned = Object.values(quantities).reduce((sum, qty) => sum + qty, 0);
 
       // Update stock for returned items
       for (const [size, quantity] of Object.entries(quantities)) {
         if (quantity > 0) {
           const item = await itemService.getItemByKey(size);
-          if (item) {
+          if (item && item.enabled) {
             const newStock = (item.stock || 0) + quantity;
             await itemService.updateItem(item.id, {
               stock: newStock
@@ -211,7 +247,7 @@ export const shopService = {
         await activityService.createActivity({
           user_id: userId,
           type: 'returned',
-          description: 'Processed returned items',
+          description: `Processed return of ${totalReturned} items`,
           items: returnedItems.join(', '),
           timestamp: new Date().toISOString()
         });
@@ -220,7 +256,13 @@ export const shopService = {
       return { success: true, message: 'Returned items processed successfully' };
     } catch (error) {
       console.error('Error processing returned items:', error);
-      throw new Error('Failed to process returned items');
+      
+      // FIX: Proper error handling for TypeScript
+      if (error instanceof Error) {
+        throw new Error(`Failed to process returned items: ${error.message}`);
+      } else {
+        throw new Error('Failed to process returned items: Unknown error occurred');
+      }
     }
   },
 
@@ -232,7 +274,24 @@ export const shopService = {
       return { success: true, message: 'Reservation created successfully' };
     } catch (error) {
       console.error('Error processing reservation:', error);
-      throw new Error('Failed to create reservation');
+      
+      // FIX: Proper error handling for TypeScript
+      if (error instanceof Error) {
+        throw new Error(`Failed to create reservation: ${error.message}`);
+      } else {
+        throw new Error('Failed to create reservation: Unknown error occurred');
+      }
+    }
+  },
+
+  // FIX: Add method to validate user data
+  validateUser: async (userId: number) => {
+    try {
+      const user = await userService.getUserById(userId);
+      return user !== null;
+    } catch (error) {
+      console.error('Error validating user:', error);
+      return false;
     }
   }
 };

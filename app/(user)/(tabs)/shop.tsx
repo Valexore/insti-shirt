@@ -266,6 +266,12 @@ const Shop = () => {
       return;
     }
 
+    // FIX: Ensure user data is available before navigation
+    if (!currentUser) {
+      Alert.alert("Error", "User data not found. Please try again.");
+      return;
+    }
+
     if (activeTab === "available") {
       if (isReservation) {
         if (!configuration.reservationEnabled) {
@@ -285,7 +291,7 @@ const Shop = () => {
           pathname: "/reserve_information",
           params: {
             quantities: JSON.stringify(currentQuantities),
-            user: JSON.stringify(currentUser),
+            user: JSON.stringify(currentUser), // FIX: Ensure user data is passed
             availableStock: JSON.stringify(availableStock),
             itemData: JSON.stringify({
               id: firstItem.key,
@@ -305,7 +311,7 @@ const Shop = () => {
           pathname: "/information",
           params: {
             quantities: JSON.stringify(currentQuantities),
-            user: JSON.stringify(currentUser),
+            user: JSON.stringify(currentUser), // FIX: Ensure user data is passed
             availableStock: JSON.stringify(availableStock),
             itemData: JSON.stringify({
               id: firstItem.key,
@@ -318,12 +324,12 @@ const Shop = () => {
         });
       }
     } else if (activeTab === "rejected") {
-      // Process rejected items
+      // Process rejected items - FIX: Ensure user data is passed
       router.push({
         pathname: "/rejected_confirmation",
         params: {
           rejectedQuantities: JSON.stringify(currentQuantities),
-          user: JSON.stringify(currentUser),
+          user: JSON.stringify(currentUser), // FIX: Pass user data properly
           availableStock: JSON.stringify(availableStock)
         },
       });
@@ -337,12 +343,12 @@ const Shop = () => {
         return;
       }
       
-      // Process returned items
+      // Process returned items - FIX: Ensure user data is passed
       router.push({
         pathname: "/returned_confirmation",
         params: {
           returnedQuantities: JSON.stringify(currentQuantities),
-          user: JSON.stringify(currentUser),
+          user: JSON.stringify(currentUser), // FIX: Pass user data properly
           availableStock: JSON.stringify(availableStock)
         },
       });

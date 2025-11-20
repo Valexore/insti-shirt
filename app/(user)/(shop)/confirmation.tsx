@@ -2,8 +2,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { shopService } from '../../../services/shopService';
+import ConfirmationModal from '../../components/ConfirmationModal';
+import Loading from '../../components/Loading';
 
 // Define the type for quantities
 type Quantities = {
@@ -29,6 +31,9 @@ const Confirmation = () => {
   const params = useLocalSearchParams();
   const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
   
   console.log('Confirmation params received:', Object.keys(params));
   
@@ -119,13 +124,15 @@ const Confirmation = () => {
       setIsProcessing(true);
       
       if (!userData) {
-        Alert.alert('Error', 'User data not found');
+        setModalMessage('User data not found');
+        setShowErrorModal(true);
         return;
       }
 
       // Validate that we have at least one item
       if (totalItems === 0) {
-        Alert.alert('Error', 'No items selected for order');
+        setModalMessage('No items selected for order');
+        setShowErrorModal(true);
         return;
       }
 
@@ -158,37 +165,28 @@ const Confirmation = () => {
       
       console.log('Sale processed successfully:', result);
       
-      Alert.alert(
-        'Order Confirmed!',
-        `Successfully processed order for ${totalItems} ${itemName}${totalItems !== 1 ? 's' : ''}. Total: ₱${totalAmount.toLocaleString()}`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              console.log('Navigating back to tabs...');
-              // Use navigate instead of replace to ensure clean state
-              router.navigate({
-                pathname: '/(user)/(tabs)',
-                params: { 
-                  user: JSON.stringify(userData),
-                  // Force refresh by adding timestamp
-                  refresh: Date.now()
-                }
-              });
-            }
-          }
-        ]
-      );
+      setModalMessage(`Successfully processed order for ${totalItems} ${itemName}${totalItems !== 1 ? 's' : ''}. Total: ₱${totalAmount.toLocaleString()}`);
+      setShowSuccessModal(true);
       
     } catch (error: any) {
       console.error('Error confirming order:', error);
-      Alert.alert(
-        'Error', 
-        `Failed to process order: ${error.message || 'Please try again.'}`
-      );
+      setModalMessage(`Failed to process order: ${error.message || 'Please try again.'}`);
+      setShowErrorModal(true);
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleSuccessConfirm = () => {
+    setShowSuccessModal(false);
+    console.log('Navigating back to tabs...');
+    router.navigate({
+      pathname: '/(user)/(tabs)',
+      params: { 
+        user: JSON.stringify(userData),
+        refresh: Date.now()
+      }
+    });
   };
 
   const handleEditOrder = () => {
@@ -207,6 +205,16 @@ const Confirmation = () => {
     });
   };
 
+  if (isProcessing) {
+    return (
+      <Loading 
+        message="Processing your order..."
+        type="pulse"
+        fullScreen={true}
+      />
+    );
+  }
+
   return (
     <View className="flex-1 bg-neutral-50">
       {/* Header */}
@@ -221,15 +229,10 @@ const Confirmation = () => {
           <Text className="text-accent-100 text-center mt-1">
             Review your order details before confirming
           </Text>
-          {isProcessing && (
-            <Text className="text-accent-100 text-center mt-2">
-              Processing order...
-            </Text>
-          )}
         </View>
       </View>
 
-      <ScrollView className="flex-1 p-4">
+      <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
         {/* Item Information Card */}
         <View className="bg-white rounded-xl p-5 mb-4 shadow-sm border border-accent-100">
           <View className="flex-row items-center mb-3">
@@ -358,8 +361,8 @@ const Confirmation = () => {
         </View>
       </ScrollView>
 
-      {/* Action Buttons */}
-      <View className="p-3 border-t border-accent-100 bg-white">
+      {/* Action Buttons - Fixed with safe area padding */}
+      <View className="p-4 pb-8 border-t border-accent-100 bg-white">
         {/* First two buttons in row */}
         <View className="flex-row space-x-4 mb-4">
           <TouchableOpacity 
@@ -384,7 +387,7 @@ const Confirmation = () => {
             }`}
           >
             <Text className="text-white text-lg font-semibold">
-              {isProcessing ? 'Processing...' : totalItems > 0 ? 'Confirm Order' : 'No Items'}
+              {totalItems > 0 ? 'Confirm Order' : 'No Items'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -404,6 +407,28 @@ const Confirmation = () => {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Custom Confirmation Modals */}
+      <ConfirmationModal
+        visible={showSuccessModal}
+        type="success"
+        title="Order Confirmed!"
+        message={modalMessage}
+        onConfirm={handleSuccessConfirm}
+        onClose={handleSuccessConfirm}
+        confirmText="OK"
+        showConfirmButton={false}
+      />
+
+      <ConfirmationModal
+        visible={showErrorModal}
+        type="error"
+        title="Error"
+        message={modalMessage}
+        onClose={() => setShowErrorModal(false)}
+        confirmText="OK"
+        showConfirmButton={false}
+      />
     </View>
   );
 };
