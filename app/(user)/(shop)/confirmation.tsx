@@ -361,7 +361,7 @@ const Confirmation = () => {
         </View>
       </ScrollView>
 
-      {/* Action Buttons - Fixed with safe area padding */}
+      {/* Action Buttons - Fixed with safe area padding  */}
       <View className="p-4 pb-8 border-t border-accent-100 bg-white">
         {/* First two buttons in row */}
         <View className="flex-row space-x-4 mb-4">
