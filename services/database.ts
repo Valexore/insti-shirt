@@ -119,7 +119,7 @@ export const initDatabase = (): Promise<void> => {
         );
       `);
 
-      // Items table - UPDATED: Added sold column
+      // Items table - UPDATED: Added sold columnss
       db.execSync(`
         CREATE TABLE IF NOT EXISTS items (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
